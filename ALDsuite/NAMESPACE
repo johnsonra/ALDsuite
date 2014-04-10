@@ -1,0 +1,30 @@
+export(admixture, admixture.par,
+# prior population setup
+       setup.prior, pcr.prior.phased, pcr.prior.unphased,
+       logitreg, load.pop, multilogitreg, setup.prior.dev,
+# likelihoods
+       P.recombination, P.gammas, P.gamma, P.a.gamma.gamma, P.gammas.a,
+       P.a.gamma, P.gamma.aX, P.O, P.O2, logP.G.lambda.d,
+       P.0crossovers, P.1plus.crossover.gamma.gamma.prev,
+       P.1plus.crossover.G, qodd.crossovers,
+       logP.lambdas.hyper, logP.P.tau.Pm, logP.Ak.omega,
+       logP.AX.omega, logP.gammas.geno.P, logP.gammas.geno.P.j,
+       logP.lambda.gammas, logP.delta.sigma,
+       rwish, rwish2, ldiwish, logP.beta.sigma.tau, ML.G,
+# updates
+       updt.alpha.beta, updt.lambda, updt.P.betas, updt.G,
+       updt.tau.Pm, updt.omega, updt.omegaX, updt.A, updt.AX,
+       updt.betas, updt.tau.Pm.prep,
+# samples
+       sample.G, sample.lambda, sample.tau.Pm.prior,
+# inferrence
+       lgs.case.only, lgs,
+# other
+       dbSNP, gen.calc, phys.calc, sic, amap, read.amap,
+       plot.amap, rdirichlet, categorize, get.rows,
+       solve.approx, reload)
+
+useDynLib(ALDsuite)
+
+S3method(plot, amap)
+S3method(summary, amap)

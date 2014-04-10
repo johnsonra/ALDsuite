@@ -1,0 +1,71 @@
+ALDsuite
+========
+
+Suite of tools for inferring Admixture Linkage Disequilibrium
+and testing disease association hypotheses
+
+WARNING - this is still an early beta version and under heavy development
+
+Versions
+========
+
+0.4.0 - February 6, 2014
+  Modifying general algorithm to take MH sample of G before updating HMM
+  Initial version availalbe on Github
+
+0.3.7 - December 12, 2013
+  Playing with marker selection in setup.prior()
+
+0.3.6 - December 10, 2013
+  Add modeling of genotypes in addition to haplotypes again (as in pcr.prior from 0.2.1)
+
+0.3.5 - December 6, 2013
+  Going back to simpler things - sampling from gammas again
+  Smaller default value for cM.linked makes more sense and gives much better results
+
+0.3.4 - December 4, 2013
+  Trying a sampling technique that is a hybrid of 0.3.3 (too noisy)
+    and 0.3.2 (not enough room for European chromosomes to come out)
+
+0.3.3 - December 4, 2013
+  Fixed small bug in P.recombination()
+  Trying new sampling technique for G -- didn't quite work, but shows promise
+
+0.3.2 - December 3, 2013
+  Playing around with sampling of G -- didn't work
+
+0.3.1 - December 2, 2013
+  Rethinking of the prior distributions of beta and Beta
+
+0.3.0 - November 29, 2013
+  Going back to v0.1.2 (using phased data)
+  Using pag similar to v0.2.0 - full support on both upstream and downstream
+    sides of the anchor marker. Using the allele frequency when there is a
+    recombination.
+  Using pcr.prior from v0.2.0 - no separate upstream / downstream models
+
+0.2.1 - November 25, 2013
+  Variation on v0.2.0 that uses genotypes rather than haplotypes
+  Didn't work, pag is not good enough at distinguishing gammas by itself
+
+0.2.0 - November 23, 2013
+  Attempt to sample chromosomes differently - using this in a
+    Metropolis-Hastings sample to infer gammas
+  Didn't work, too noisy
+
+0.1.2 - November 22, 2013
+  Using phased data
+
+0.1.1 - November 18, 2013
+  Instead of tracking non-existant haplotypes, just use the allele frequency
+    when there is a crossover.
+
+0.1.0
+?
+
+0.0.1 - October 18, 2013
+  Many bug fixes
+  Spun off data sets into ALDdata package
+
+0.0.0 - August 28, 2013
+  First (alpha) version of ALDsuite

@@ -1,0 +1,202 @@
+# inference.R
+# functions to infer statistical significance to admixture estimates
+# Randall Johnson
+# BSP CCR Genetics Core at Frederick National Laboratory
+# SAIC-Frederick, Inc
+# Created December 18, 2012
+# Last Modified August 8, 2013
+
+lgs.case.only <- function(adm, phi1, phi2 = phi1^2, phi0 = 1, pop = 1, cases = NULL, dev = FALSE)
+{
+    # checks
+    if(is.null(cases))
+        cases <- rownames(adm$final$A0)
+
+    # get number of populations we are dealing with
+    npops <- dim(adm$final$P)[2]
+
+    # convert pop to number if label given
+    if(is.character(pop))
+        pop <- which(dimnames(adm$final$P)[[2]] == pop)
+
+    # get names of Aj that we want
+    probs2 <- which(dimnames(adm$final$Aj)[[3]] == paste('g', pop, pop, sep = ''))
+
+    probs1 <- grep(pop, dimnames(adm$final$Aj)[[3]])
+    probs1 <- probs1[probs1 != probs2] # probs2 is of length 1
+
+    probs0 <- which(!1:length(dimnames(adm$final$Aj)[[3]]) %in% c(probs1, probs2))
+
+    ### numerator ###
+    if(length(probs0) == 1)
+    {
+        p0 <- adm$final$Aj[cases,,probs0] # probability of 0 risk alleles
+    }else{
+        p0 <- apply(adm$final$Aj[cases,,probs0], 1:2, sum)
+    }
+
+    if(length(probs1) == 1)
+    {
+        p1 <- adm$final$Aj[cases,,probs1] # probability of 1 risk allele
+    }else{
+        p1 <- apply(adm$final$Aj[cases,,probs1], 1:2, sum)
+    }
+
+    # always of length 1
+    p2 <- adm$final$Aj[cases,,probs2] # probability of 2 risk alleles
+
+    # product of the wighted, summed probabilities
+    num <- apply(log(p0*phi0 + p1*phi1 + p2*phi2), 2, sum)
+
+    ### denominator ###
+    den <- sum(log((1 - adm$final$A0[cases,pop])^2 * phi0 +
+                   2 * adm$final$A0[cases,pop] * (1 - adm$final$A0[cases,pop]) * phi1 +
+                   adm$final$A0[cases,pop]^2 * phi2))
+
+    ### likelihood ###
+    lod <- num - den
+
+    return(lod)
+}
+
+lgs <- function(formula, adm, phi1, phi0 = 1, phi2 = phi1^2, pop = 1, covars = NULL, family = binomial)
+{
+    ##### checks & setup #####
+
+    # to do:
+    # check that adm and covars are ordered the same (by individual)
+
+    ## formula checks & parsing ##
+
+    # if no left hand side, run lgs.case.only --- must no have covars! i.e. formula must be "~ 1"
+    ## if(length(formula) == 2)
+    ## {
+    ##     if(formula == formula(~ 1))
+    ##         return(lgs.case.only(adm, phi0 = phi0, phi1 = phi1, phi2 = phi2, pop = pop))
+
+    ##     print(formula)
+    ##     stop("The intercept-only formula (i.e. '~ 1') is the only acceptible one sided option.")
+    ## }
+
+    # family check - most of this section is taken from glm()
+    if (is.character(family))
+        family <- get(family, mode = "function", envir = parent.frame())
+
+    if (is.function(family))
+        family <- family()
+
+    if (is.null(family$family))
+    {
+        print(family)
+        stop("'family' not recognized")
+    }
+
+    # formula parsing
+    if(is.null(covars))
+        covars <- environment(formula)
+
+    covars$.A <- adm$final$A0[, pop] # this assumes indivdiuals are ordered the same as in covars!!!!!!!
+    covars$.Ak <- apply(adm$final$Ak[,,pop], 1, prod)
+
+    tmp <- attributes(terms(formula))
+    ## formula <- formula(paste(attributes(tmp$factors)$dimnames[[1]][1], ' ~ ',
+    ##                          paste(c('.A', tmp$term.labels), collapse = '+')))
+
+    if(tmp$response)
+    {
+        formula <- reformulate(termlabels = c('.A', '.Ak', tmp$term.labels),
+                               response = as.character(tmp$variables)[2],
+                               intercept = tmp$intercept)
+    }else{
+        covars$case.only <- rep(1, length(covars$.A))
+        formula <- reformulate(termlabels = c('.A', '.Ak', tmp$term.labels),
+                               response = "case.only",
+                               intercept = 0)
+    }
+
+
+    ## population parsing ##
+
+    # total number of populations
+    npops <- dim(adm$final$P)[2]
+
+    # convert pop to number if label given
+    if(is.character(pop))
+        pop <- which(dimnames(adm$final$P)[[2]] == pop)
+
+    # sort names of Aj into appropriate groups
+    probs2 <- which(dimnames(adm$final$Aj)[[3]] == paste('g', pop, pop, sep = ''))
+
+    probs1 <- grep(pop, dimnames(adm$final$Aj)[[3]])
+    probs1 <- probs1[probs1 != probs2] # probs2 is of length 1
+
+    probs0 <- which(!1:length(dimnames(adm$final$Aj)[[3]]) %in% c(probs1, probs2))
+
+
+    # get probability totals
+    if(length(probs0) == 1)
+    {
+        p0 <- adm$final$Aj[,,probs0] # probability of 0 risk alleles
+    }else{
+        p0 <- apply(adm$final$Aj[,,probs0], 1:2, sum)
+    }
+
+    if(length(probs1) == 1)
+    {
+        p1 <- adm$final$Aj[,,probs1] # probability of 1 risk allele
+    }else{
+        p1 <- apply(adm$final$Aj[,,probs1], 1:2, sum)
+    }
+
+    # always of length 1
+    p2 <- adm$final$Aj[,,probs2] # probability of 2 risk alleles
+
+
+    ##### null model #####
+
+    Ho <- glm(formula, family = family, data = covars)
+    if(family$family != 'binomial')
+    {
+        e <- Ho$residuals
+        e.sd <- sd(e)
+
+        # P(y | Ho) --- denominator
+        logPy.Ho <- sum(log(dnorm(e, sd = e.sd)))
+    }else{ # binomial
+        logPy.Ho <- sum(log(Ho$fitted.values))
+    }
+
+    ##### Alternate model #####
+
+    phi <- log(p0*phi0 + p1*phi1 + p2*phi2)
+    phibar <- apply(phi, 2, mean)
+
+    if(family$family != 'binomial')
+    {
+        # put e and phibar into matrices with similar dimensions as phi
+        e.mat <- matrix(rep(e, length(phibar)), nrow = length(e)) # each row is identical
+        phibar.mat <- matrix(rep(phibar, each = length(e)), nrow = length(e)) # each column is identical
+
+        e.alternate <- e.mat - phibar.mat + phi
+
+        logPy.Ha <- apply(log(dnorm(e.alternate, sd = e.sd)), 2, sum)
+    }else{
+        # fitted probabilities / odds
+        p <- Ho$fitted.values
+        lod <- log(p) - log(1 - p)
+
+        # set up matricies for addition
+        lod.mat <- matrix(rep(lod, length(phibar)), nrow = length(lod)) # each row is identical
+        phibar.mat <- matrix(rep(phibar, each = length(lod)), nrow = length(lod)) # each column is identical
+
+        lod.alternate <- lod - phibar.mat + phi
+        p.alternate <- exp(lod.alternate) / (1 + exp(lod.alternate))
+
+        logPy.Ha <- apply(log(p.alternate), 2, sum)
+    }
+
+    ### Bayes factor ###
+    Bf <- logPy.Ha - logPy.Ho
+
+    return(Bf)
+}
