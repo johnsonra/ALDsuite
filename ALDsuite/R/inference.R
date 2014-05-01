@@ -4,54 +4,55 @@
 # BSP CCR Genetics Core at Frederick National Laboratory
 # SAIC-Frederick, Inc
 # Created December 18, 2012
-# Last Modified August 8, 2013
+# Last Modified May 1, 2014
 
-lgs.case.only <- function(adm, phi1, phi2 = phi1^2, phi0 = 1, pop = 1, cases = NULL, dev = FALSE)
+lgs.case.only <- function(adm, phi1, phi2 = phi1^2, phi0 = 1, pop = 1, cases = NULL, dev = FALSE,
+                          phased = FALSE)
 {
     # checks
     if(is.null(cases))
-        cases <- rownames(adm$final$A0)
+        cases <- rownames(adm$A0)
 
     # get number of populations we are dealing with
-    npops <- dim(adm$final$P)[2]
+    npops <- dim(adm$P)[2]
 
     # convert pop to number if label given
     if(is.character(pop))
-        pop <- which(dimnames(adm$final$P)[[2]] == pop)
+        pop <- which(dimnames(adm$P)[[2]] == pop)
 
     # get names of Aj that we want
-    probs2 <- which(dimnames(adm$final$Aj)[[3]] == paste('g', pop, pop, sep = ''))
+    probs2 <- which(dimnames(adm$gammas)[[3]] == paste('g', pop, pop, sep = ''))
 
-    probs1 <- grep(pop, dimnames(adm$final$Aj)[[3]])
+    probs1 <- grep(pop, dimnames(adm$gammas)[[3]])
     probs1 <- probs1[probs1 != probs2] # probs2 is of length 1
 
-    probs0 <- which(!1:length(dimnames(adm$final$Aj)[[3]]) %in% c(probs1, probs2))
+    probs0 <- which(!1:length(dimnames(adm$gammas)[[3]]) %in% c(probs1, probs2))
 
     ### numerator ###
     if(length(probs0) == 1)
     {
-        p0 <- adm$final$Aj[cases,,probs0] # probability of 0 risk alleles
+        p0 <- adm$gammas[cases,,probs0] # probability of 0 risk alleles
     }else{
-        p0 <- apply(adm$final$Aj[cases,,probs0], 1:2, sum)
+        p0 <- apply(adm$gammas[cases,,probs0], 1:2, sum)
     }
 
     if(length(probs1) == 1)
     {
-        p1 <- adm$final$Aj[cases,,probs1] # probability of 1 risk allele
+        p1 <- adm$gammas[cases,,probs1] # probability of 1 risk allele
     }else{
-        p1 <- apply(adm$final$Aj[cases,,probs1], 1:2, sum)
+        p1 <- apply(adm$gammas[cases,,probs1], 1:2, sum)
     }
 
     # always of length 1
-    p2 <- adm$final$Aj[cases,,probs2] # probability of 2 risk alleles
+    p2 <- adm$gammas[cases,,probs2] # probability of 2 risk alleles
 
     # product of the wighted, summed probabilities
     num <- apply(log(p0*phi0 + p1*phi1 + p2*phi2), 2, sum)
 
     ### denominator ###
-    den <- sum(log((1 - adm$final$A0[cases,pop])^2 * phi0 +
-                   2 * adm$final$A0[cases,pop] * (1 - adm$final$A0[cases,pop]) * phi1 +
-                   adm$final$A0[cases,pop]^2 * phi2))
+    den <- sum(log((1 - adm$A0[cases,pop])^2 * phi0 +
+                   2 * adm$A0[cases,pop] * (1 - adm$A0[cases,pop]) * phi1 +
+                   adm$A0[cases,pop]^2 * phi2))
 
     ### likelihood ###
     lod <- num - den
