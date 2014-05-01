@@ -2,7 +2,8 @@ ALDsuite
 ========
 
 Suite of tools for inferring Admixture Linkage Disequilibrium
-and testing disease association hypotheses
+and testing disease association hypotheses. A companion package,
+ALDdata, is also available at http://github.com/johnsonra/ALDdata.
 
 WARNING - this is still an early beta version and under heavy development
 
