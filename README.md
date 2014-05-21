@@ -12,5 +12,5 @@ Versions
 
 0.4.0 - Current development version
 
-Modifying general algorithm to take MH sample of G before updating HMM
-Initial version availalbe on Github
+* Modifying general algorithm to take MH sample of G before updating HMM
+* Initial version availalbe on Github
