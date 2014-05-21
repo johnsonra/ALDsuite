@@ -4,11 +4,17 @@
 # BSP CCR Genetics Core at Frederick National Laboratory
 # SAIC-Frederick, Inc
 # Created December 18, 2012
-# Last Modified May 2, 2014
+# Last Modified May 21, 2014
+
+mald <- function(formula, adm)
+{
+
+}
 
 lgs.case.only <- function(adm, phi1, phi2 = phi1^2, phi0 = 1, pop = 1, cases = NULL, dev = FALSE,
                           phased = FALSE)
 {
+    warning('lgs.case.only() is not currently working properly. All output is suspect.')
     # checks
     if(is.null(cases))
         cases <- rownames(adm$A0)
@@ -17,11 +23,12 @@ lgs.case.only <- function(adm, phi1, phi2 = phi1^2, phi0 = 1, pop = 1, cases = N
     npops <- dim(adm$P)[2]
 
     # convert pop to number if label given
-    if(is.character(pop))
+    if(is.character(pop)) ######### check that we have a valid population!
         pop <- which(dimnames(adm$P)[[2]] == pop)
 
     if(!phased)
     {
+        stop('Unphased analysis not yet implemented')
         # get names of Aj that we want
         probs2 <- which(dimnames(adm$gammas)[[3]] == paste('g', pop, pop, sep = ''))
 
@@ -70,6 +77,7 @@ lgs.case.only <- function(adm, phi1, phi2 = phi1^2, phi0 = 1, pop = 1, cases = N
 
 lgs <- function(formula, adm, phi1, phi0 = 1, phi2 = phi1^2, pop = 1, covars = NULL, family = binomial)
 {
+    warning('lgs() has not been properly tested. All output is suspect.')
     ##### checks & setup #####
 
     # to do:
