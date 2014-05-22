@@ -10,7 +10,9 @@ WARNING - this is still an early beta version and under heavy development
 Versions
 ========
 
-0.4.1 - Current development version
+0.4.2 - Current development version
+
+0.4.1 - May 22, 2014
 
 * Addition of disease gene mapping functions
 
