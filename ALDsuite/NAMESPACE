@@ -18,7 +18,7 @@ export(admixture, admixture.par,
 # samples
        sample.G, sample.lambda, sample.tau.Pm.prior,
 # inferrence
-       lgs.case.only, lgs,
+       mald, mald.j, #lgs.case.only, lgs,
 # other
        dbSNP, gen.calc, phys.calc, sic, amap, read.amap,
        plot.amap, rdirichlet, categorize, get.rows,
