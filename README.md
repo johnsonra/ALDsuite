@@ -10,7 +10,11 @@ WARNING - this is still an early beta version and under heavy development
 Versions
 ========
 
-0.4.0 - Current development version
+0.4.1 - Current development version
+
+* Addition of disease gene mapping functions
+
+0.4.0 - February 6, 2014
 
 * Modifying general algorithm to take MH sample of G before updating HMM
 * Initial version availalbe on Github
