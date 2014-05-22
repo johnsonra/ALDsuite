@@ -4,11 +4,44 @@
 # BSP CCR Genetics Core at Frederick National Laboratory
 # SAIC-Frederick, Inc
 # Created December 18, 2012
-# Last Modified May 21, 2014
+# Last Modified May 22, 2014
 
-mald <- function(formula, adm)
+mald <- function(adm, data, formula = NULL, pop = 1, family = 'binomial', keep.models = FALSE)
 {
+    # default formula
+    if(is.null(formula))
+        formula <- formula('case ~ g')
 
+    # check that names match
+    if(is.null(rownames(data)))
+    {
+        warning("Rownames of data undefined. Assuming data is properly sorted")
+    }else{
+        if(any(rownames(data) != dimnames(adm$gammas)[[1]]))
+            stop("Row names of data seem to be incorrectly sorted or labeled")
+    }
+
+    # this is how many markers we are working with
+    J <- dim(adm$gammas)[2]
+
+    # if we are keeping all model objects, run with lapply
+    models <- lapply(1:J, mald.j, formula = formula, pop = pop, adm = adm,
+                     data = data, family = family, keep.models = keep.models)
+
+    # return results
+    return(models)
+}
+
+mald.j <- function(j, adm, data, formula, pop, family, keep.models)
+{
+    data$g <- apply(adm$gammas[,j,,pop], 1, sum)
+
+    model <- glm(formula, data = data, family = family)
+
+    if(keep.models)
+        return(summary(model))
+
+    return(list(coefficients = summary(model)$coefficients))
 }
 
 lgs.case.only <- function(adm, phi1, phi2 = phi1^2, phi0 = 1, pop = 1, cases = NULL, dev = FALSE,
