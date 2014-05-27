@@ -4,13 +4,13 @@
 # BSP CCR Genetics Core at Frederick National Laboratory
 # SAIC-Frederick, Inc
 # Created December 18, 2012
-# Last Modified May 22, 2014
+# Last Modified May 27, 2014
 
 mald <- function(adm, data, formula = NULL, pop = 1, family = 'binomial', keep.models = FALSE)
 {
     # default formula
     if(is.null(formula))
-        formula <- formula('case ~ g')
+        formula <- formula('case ~ a + ak + g')
 
     # check that names match
     if(is.null(rownames(data)))
@@ -20,6 +20,10 @@ mald <- function(adm, data, formula = NULL, pop = 1, family = 'binomial', keep.m
         if(any(rownames(data) != dimnames(adm$gammas)[[1]]))
             stop("Row names of data seem to be incorrectly sorted or labeled")
     }
+
+    # create a and ak
+    data$a <- adm$A0[pop]
+    data$ak <- apply(adm$Ak[,,pop], 1, prod)
 
     # this is how many markers we are working with
     J <- dim(adm$gammas)[2]
