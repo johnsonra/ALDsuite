@@ -3,6 +3,7 @@
 # Randy Johnson
 # Laboratory of Genomic Diversity at NCI Frederick
 
+# this file is deprecated...should remove at some point
 
 amap <- function(param.file.name = 'param', preset = NULL, risk = 2.0, indivname = 'indiv.dat',
                  snpname = 'snps.dat', genotypename = 'geno.dat', badsnpname = NA,
