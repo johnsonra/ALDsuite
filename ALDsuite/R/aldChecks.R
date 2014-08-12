@@ -248,6 +248,7 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn,
          warning(sum(marker.check < marker.geno.check), " markers with less than ",
                  round(marker.geno.check * 100),
                  "% complete genotyping detected.")
+ }
 
 ##### check for an excess of monomorphic markers #####
     ## # allele frequencies
@@ -275,6 +276,7 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn,
         haps <- tmp
 
         geno <- apply(haps, 1:2, sum)
+    }
     }
 
     ## hwe <- apply(geno[,chr != sex.chr], 2, table)
@@ -323,4 +325,3 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn,
     ##     warning(sum(hwe < hwe.thresh), " markers failed HWE test.")
 
 ##### check for allele flips later on in the process #####
-}

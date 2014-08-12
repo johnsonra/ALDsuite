@@ -22,7 +22,7 @@ export(admixture, admixture.par,
 # other
        dbSNP, gen.calc, phys.calc, sic, amap, read.amap,
        plot.amap, rdirichlet, categorize, get.rows,
-       solve.approx, reload)
+       solve.approx, reload, ald.qc)
 
 useDynLib(ALDsuite)
 
