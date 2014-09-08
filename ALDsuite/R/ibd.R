@@ -19,3 +19,11 @@ O.shared <- function(genos, ibs)
 }
 
 
+############################################################
+# Expected number of shared alleles at the given IBS level #
+############################################################
+
+E.shared <- function(geno, ibs)
+{
+
+}
