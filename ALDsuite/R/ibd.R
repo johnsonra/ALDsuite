@@ -2,7 +2,7 @@
 # Functions to infer relatedness
 # Randall Johnson
 # BSP CCR Genetics Core at Frederick National Laboratory
-# Last Modified September 8, 2014
+# Last Modified September 9, 2014
 
 # formulas in this file follow those described in PLINK paper (Purcell 2007)
 
@@ -10,12 +10,12 @@
 # Observed number of shared alleles at the given IBS level #
 ############################################################
 
-O.shared <- function(genos, ibs)
+O.shared <- function(genos)
 {
     # number of alleles shared
     shared <- 2 - abs(genos[1,] - genos[2,])
 
-    return(sum(shared == ibs))
+    return(c(ibs0 = sum(shared == 0), ibs1 = sum(shared = 1), ibs2 = sum(shared = 2)))
 }
 
 
@@ -87,4 +87,33 @@ ibd.pairs <- function(geno)
 
     ######### E(IBS = 2 | IBD = 2) #########
     ibs2ibd2 <- n
+
+######### Calculation of IBD Probabilities #########
+    retval <- data.frame(id1 = rep(NA, (dim(geno)[1]^2 - dim(geno)[1])/2),
+                         id2 = NA,
+                         ibd0 = NA,
+                         ibd1 = NA,
+                         ibd2 = NA)
+
+    i <- 0
+    for(i1 in 1:(dim(geno)[1] - 1))
+        for(i2 in (i1 + 1):dim(geno)[1])
+        {
+            i <- i + 1
+
+            retval$id1[i] <- i1
+            retval$id2[i] <- i2
+            tmp <- O.shared(geno[c(i1,i2),])
+            retval$ibd0[i] <- tmp$ibs0
+            retval$ibd1[i] <- tmp$ibs1
+            retval$ibd2[i] <- tmp$ibs2
+        }
+
+    if(!is.null(dimnames(geno)))
+    {
+        retval$id1 <- dimnames(geno)[[1]][retval$id1]
+        retval$id2 <- dimnames(geno)[[1]][retval$id2]
+    }
+
+    return(retval)
 }
