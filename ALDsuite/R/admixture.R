@@ -4,7 +4,7 @@
 # BSP CCR Genetics Core at Frederick National Laboratory for Cancer Research
 # SAIC-Frederick, Inc
 # Created September 10, 2012
-# Last Modified December 11, 2013
+# Last Modified September 12, 2014
 
 # see documentation for details on these arguments
 admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, burn = 100,
@@ -14,18 +14,17 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                       debug = FALSE, sex.chr = 23, indiv.geno.check = 0.98,
                       marker.geno.check = .98, hwe.thresh = 1e-4, bad.indiv = NULL,
                       bad.marker = NULL, male.het.X = 1, fast = FALSE, A0 = NULL, Ak = NULL)
-                      
- ald.qc(Pm.prior, haps, geno, gender, chr, pos, burn,
-                      iter, every, indiv.id, marker.id, pop.id,
-                      lambda, tau, omega, rand.seed,
-                      cores, cl, dev, verbose,
-                      debug, sex.chr, indiv.geno.check,
-                      marker.geno.check, hwe.thresh, bad.indiv,
-                      bad.marker, male.het.X, fast, A0, Ak)
 {
 
 
-##### check for allele flips later on in the process #####
+### QC checks on data formatting and genetic data
+    ald.qc(Pm.prior, haps, geno, gender, chr, pos, burn,
+           iter, every, indiv.id, marker.id, pop.id,
+           lambda, tau, omega, rand.seed,
+           cores, cl, dev, verbose,
+           debug, sex.chr, indiv.geno.check,
+           marker.geno.check, hwe.thresh, bad.indiv,
+           bad.marker, male.het.X, fast, A0, Ak)
 
 
 #########
