@@ -4,24 +4,41 @@
 # BSP CCR Genetics Core at Frederick National Laboratory for Cancer Research
 # Leidos Biomedical Research, Inc
 # Created June 23, 2014
-# Last Modified September 12, 2014
+# Last Modified October 7, 2014
 
 
 ###################################
 # Original R functions for checks #
 ###################################
 
-#<<<<<<<<<<<<<<<<<< checks need to be updated to handle both haps and geno >>>>>>>>>>>>>>>>>
-
 ##### be sure all variables are formatted properly #####
-####### check for oddities in genetic data, too ########
+######## check for quality of genetic data, too ########
 
 ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, indiv.id,
                    marker.id, pop.id, lambda, tau, omega, rand.seed, cores, cl, dev,
                    verbose, debug, sex.chr, indiv.geno.check, marker.geno.check,
                    hwe.thresh, bad.indiv, bad.marker, male.het.X, fast, A0, Ak)
 {
-    ## # type checks on ids
+######### make sure we have things defined #########
+    if(!is.null(haps) & is.null(dimnames(haps)[[2]]))
+        stop("Missing marker names for haps.")
+
+    if(is.null(dimnames(geno)[[2]]))
+        stop("Missing marker names for geno.")
+
+    if(is.null(indiv.id))
+        indiv.id <- dimnames(geno)[[1]]
+
+    if(is.null(marker.id))
+        marker.id <- names(Pm.prior)
+
+    if(is.null(pop.id))
+        stop("pop.id is missing")
+
+
+######### Type checks #########
+
+    # character checks
     if(is.factor(indiv.id))
         indiv.id <- as.character(indiv.id)
 
@@ -31,7 +48,7 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
     if(is.factor(pop.id))
         pop.id <- as.character(pop.id)
 
-    ## # boolean checks
+    # boolean checks
     if(!is.logical(dev))
     {
         warning("Incorrect data type for dev, ignoring input.")
@@ -50,48 +67,7 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
         debug <- FALSE
     }
 
-    ## # geno format check
-    if(any(dimnames(geno)[[1]] != indiv.id))
-        warning(sum(dimnames(geno)[[1]] != indiv.id), " individual names in geno do not match indiv.id.")
-
-    if(any(dimnames(geno)[[2]] != marker.id))
-        warning(sum(dimnames(geno)[[2]] != marker.id), " marker names in geno do not match marker.id.")
-
-    ## # gender format check
-    if(!is.null(gender) & length(gender) != dim(geno)[1])
-        stop("Length of gender should be ", dim(geno)[1], '.')
-
-    if(any(names(gender) != indiv.id))
-        warning(sum(names(gender) != indiv.id), " names of the gender variable do not match indiv.id.")
-
-    ## # chr format check
-    if(length(chr) != length(Pm.prior))
-        stop("Length of chr should be ", length(Pm.prior), '.')
-
-    if(any(names(chr) != marker.id))
-        warning(sum(names(chr) != marker.id), " names of the chr variable do not match marker.id.")
-
-    ## # pos/d format check
-    if(!is.null(pos) & length(pos) != dim(geno)[2])
-        stop("Length of pos should be", dim(geno)[2], '.')
-
-    # Pm.prior format check
-    if(!all(names(Pm.prior[[1]][[3]]) == pop.id) & !is.null(pop.id))
-        stop("Pm.prior must have the same names as pop.id when pop.id is not null.")
-
-    ## names of Pm.prior should be in column names of haps (and geno?)-needs to be updated
-    ## if(!length(Pm.prior) == dim(geno)[2])
-    ##     stop("Each element of Pm.prior must have the same length, equal to the number of columns in geno.")
-
-    if(any(names(Pm.prior) != marker.id))
-        stop("Each marker in Pm.prior needs to be present in marker.id when not null.")
-
-    if(any(unlist(lapply(Pm.prior, length)) != 3) | # each marker should have 3 elements
-       length(table(unlist(lapply(Pm.prior, lapply, length)))) != 1) # each element should have length K
-        stop("Formatting error in Pm.prior detected.")
-
-
-    ## # numeric checks
+    # numeric checks
     if(!is.numeric(burn) | length(burn) != 1 | burn < 0)
     {
         warning("Invalid value for burn, ignoring input.")
@@ -156,49 +132,79 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
         marker.geno.check <- 0.98
     }
 
-    ## # IDs - some of this is already taken care of above
-    if(!is.null(indiv.id) & length(indiv.id) != dim(geno)[1])
-        stop("Incorrect length of indiv.id.")
-
-    ## # names of Pm.prior should be the same as marker.ids (and ordered properly)
-    if(!is.null(marker.id) & length(marker.id) != length(Pm.prior))
-        stop("Incorrect length of marker.id.")
-
     if(!is.null(pop.id) & length(pop.id) != length(Pm.prior[[1]]$freq))
         stop("Incorrect length of pop.id.")
 
-    ## # other data types
+    # other data types
     if(!is.null(cl) & !"cluster" %in% class(cl))
         stop("Invalid value for cl.")
 
 
-##### be sure gender is specified if anything in chr == sex.chr #####
+########## check geno/haplo-types ##########
+
+    if(is.null(geno) & is.null(haps))
+        stop("Either geno or haps must be specified")
+
+    # check that this matches with haps if given
+    if(!is.null(haps))
+        if(!all(apply(haps, 1:2, sum) == geno))
+            stop("Both haps and geno given, but genotypes don't match")
+
+    # geno format check
+    if(any(dimnames(geno)[[1]] != indiv.id))
+        warning(sum(dimnames(geno)[[1]] != indiv.id), " individual names in geno do not match indiv.id.")
+
+    # gender format check
+    if(!is.null(gender) & length(gender) != dim(geno)[1])
+        stop("Length of gender should be ", dim(geno)[1], '.')
+
+    # names of Pm.prior should be in column names of haps (and geno?)-needs to be updated
+    if(!all(names(Pm.prior) %in% dimnames(geno)[[2]]))
+        stop("Each element of Pm.prior must be associated with a column of geno.")
+
+    if(!is.null(haps))
+    {
+        # haps format check
+        if(any(dimnames(haps)[[1]] != indiv.id))
+            warning(sum(dimnames(haps)[[1]] != indiv.id), " individual names in haps do not match indiv.id.")
+
+        # names of Pm.prior should be in column names of haps (and geno?)-needs to be updated
+        if(!all(names(Pm.prior) %in% dimnames(haps)[[2]]))
+            stop("Each element of Pm.prior must be associated with a column of geno.")
+    }
+
+    if(any(names(gender) != indiv.id))
+        warning(sum(names(gender) != indiv.id), " names of the gender variable do not match indiv.id.")
+
+    # chr format check
+    if(length(chr) != length(Pm.prior))
+        stop("Length of chr should be ", length(Pm.prior), '.')
+
+    if(any(names(chr) != marker.id))
+        warning(sum(names(chr) != marker.id), " names of the chr variable do not match marker.id.")
+
+    # Pm.prior format check
+    if(!all(names(Pm.prior[[1]][[3]]) == pop.id) & !is.null(pop.id))
+        stop("Pm.prior must have the same names as pop.id when pop.id is not null.")
+
+    # pos/d format check
+    if(length(names(Pm.prior)) != length(pos))
+        stop("Length of pos (", length(pos),  ") should be match length of Pm.prior (", length(names(Pm.prior)), ').')
+
+    if(any(names(Pm.prior) != marker.id))
+        stop("Each marker in Pm.prior needs to be present in marker.id when not null.")
+
+    if(any(unlist(lapply(Pm.prior, length)) != 3) | # each marker should have 3 elements
+       length(table(unlist(lapply(Pm.prior, lapply, length)))) != 1) # each element should have length K
+        stop("Formatting error in Pm.prior detected.")
+
+
+########## be sure gender is specified if anything in chr == sex.chr ##########
     if(is.null(gender) & any(chr == sex.chr))
         stop("Sex chromosomes detected but gender is null")
 
 
-##### drop any bad individuals / makers #####
-
-    #### make sure bad.marker and bad.indiv are reasonable before doing this!!!
-
-    if(!is.null(bad.marker))
-    {
-        warning("bad.marker is not properly tested. Odd things will happen when using this option!")
-        geno <- geno[,-bad.marker]
-        chr <- chr[-bad.marker]
-        marker.id <- marker.id[-bad.marker]
-        pos <- pos[-bad.marker]
-    }
-
-    if(!is.null(bad.indiv))
-    {
-        ## geno <- geno[-bad.indiv,]
-        gender <- gender[-bad.indiv]
-        indiv.id <- indiv.id[-bad.indiv]
-    }
-
-
-##### gender check #####
+########## gender check ##########
     if(any(chr == sex.chr))
     {
          # check males
@@ -230,7 +236,7 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
         sex.check <- NULL
     }
 
-##### check for complete genotyping (by individual / by marker) #####
+########## check for complete genotyping (by individual / by marker) ##########
     indiv.check <- apply(!is.na(haps), 1, sum) / dim(haps)[2]
     marker.check <- apply(!is.na(haps), 2, sum) / dim(haps)[1]
 
@@ -244,80 +250,70 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
                 round(marker.geno.check * 100),
                 "% complete genotyping detected.")
 
-##### check for an excess of monomorphic markers #####
-    ## # allele frequencies
-    ## tmp <- sapply(names(Pm.prior), function(x) mean(geno[,x] / 2, na.rm = TRUE) / 2)
 
-    ## if(any(tmp == 0))
-    ## {
-    ##     warning(sum(tmp == 0), " monomorphic markers present. A large number of monomorphic",
-    ##             " markers could indicate some problems with the data.")
-    ## }
-
-
-##### check HWE #####
+########## check HWE ##########
     hwe <- NULL
 
-    ### have had some recent changes to the arguments...recheck this section!
+    # have had some recent changes to the arguments...recheck this section!
 
-    ## if(!is.null(haps))
-    ## {
-    ##     tmp <- array(0, dim = c(dim(haps)[1] / 2, dim(haps)[2], 2),
-    ##                  dimnames = list(dimnames(haps)[[1]][1:(dim(haps)[1]/2) * 2 - 1],
-    ##                                  dimnames(haps)[[2]], c('Mother', 'Father')))
+    if(is.null(geno))
+    {
+        tmp <- array(0, dim = c(dim(haps)[1] / 2, dim(haps)[2], 2),
+                     dimnames = list(dimnames(haps)[[1]][1:(dim(haps)[1]/2) * 2 - 1],
+                                     dimnames(haps)[[2]], c('Mother', 'Father')))
 
-    ##     tmp[,,1] <- haps[1:dim(tmp)[1] * 2 - 1,]
-    ##     tmp[,,2] <- haps[1:dim(tmp)[1] * 2,]
-    ##     haps <- tmp
+        tmp[,,1] <- haps[1:dim(tmp)[1] * 2 - 1,]
+        tmp[,,2] <- haps[1:dim(tmp)[1] * 2,]
+        haps <- tmp
 
-    ##     geno <- apply(haps, 1:2, sum)
-    ## }
+        geno <- apply(haps, 1:2, sum)
+    }
 
 
-    ## hwe <- apply(geno[,chr != sex.chr], 2, table)
-    ## if(is.list(hwe))
-    ## {
-    ##     tmp <- matrix(0, nrow = 3, ncol = length(hwe),
-    ##                   dimnames = list(c('0', '1', '2'), colnames(geno)[chr != sex.chr]))
+    hwe <- apply(geno[,chr != sex.chr], 2, table)
+    if(is.list(hwe))
+    {
+        tmp <- matrix(0, nrow = 3, ncol = length(hwe),
+                      dimnames = list(c('0', '1', '2'), colnames(geno)[chr != sex.chr]))
 
-    ##     tmp['0',] <- sapply(hwe, `[`, '0')
-    ##     tmp['1',] <- sapply(hwe, `[`, '1')
-    ##     tmp['2',] <- sapply(hwe, `[`, '2')
+        tmp['0',] <- sapply(hwe, `[`, '0')
+        tmp['1',] <- sapply(hwe, `[`, '1')
+        tmp['2',] <- sapply(hwe, `[`, '2')
 
-    ##     tmp[is.na(tmp)] <- 0
+        tmp[is.na(tmp)] <- 0
 
-    ##     hwe <- tmp
-    ## }
+        hwe <- tmp
+    }
 
-    ## hwe <- hwexact(hwe['0',], hwe['1',], hwe['2',])
-    ## names(hwe) <- marker.id[!chr == sex.chr]
+    hwe <- hwexact(hwe['0',], hwe['1',], hwe['2',])
+    names(hwe) <- marker.id[!chr == sex.chr]
 
-    ## # only do females on this set...can't really say anything with males
-    ## if(any(chr == sex.chr) & any(gender == 'F'))
-    ## {
-    ##     hweX <- apply(geno[gender == 'F', chr == sex.chr], 2, table)
-    ##     if(is.list(hweX))
-    ##     {
-    ##         tmp <- matrix(0, nrow = 3, ncol = length(hweX),
-    ##                       dimnames = list(c('0', '1', '2'), colnames(geno)[chr == sex.chr]))
+    # only do females on this set...can't really say anything with males
+    if(any(chr == sex.chr) & any(gender == 'F'))
+    {
+        hweX <- apply(geno[gender == 'F', chr == sex.chr], 2, table)
+        if(is.list(hweX))
+        {
+            tmp <- matrix(0, nrow = 3, ncol = length(hweX),
+                          dimnames = list(c('0', '1', '2'), colnames(geno)[chr == sex.chr]))
 
-    ##         tmp['0',] <- sapply(hweX, `[`, '0')
-    ##         tmp['1',] <- sapply(hweX, `[`, '1')
-    ##         tmp['2',] <- sapply(hweX, `[`, '2')
+            tmp['0',] <- sapply(hweX, `[`, '0')
+            tmp['1',] <- sapply(hweX, `[`, '1')
+            tmp['2',] <- sapply(hweX, `[`, '2')
 
-    ##         tmp[is.na(tmp)] <- 0
+            tmp[is.na(tmp)] <- 0
 
-    ##         hweX <- tmp
-    ##     }
+            hweX <- tmp
+        }
 
-    ##     hweX <- hwexact(hweX['0',], hweX['1',], hweX['2',])
-    ##     names(hweX) <- marker.id[chr == sex.chr]
+        hweX <- hwexact(hweX['0',], hweX['1',], hweX['2',])
+        names(hweX) <- marker.id[chr == sex.chr]
 
-    ##     hwe <- c(hwe, hweX)
-    ## }
+        hwe <- c(hwe, hweX)
+    }
 
-    ## if(any(hwe < hwe.thresh))
-    ##     warning(sum(hwe < hwe.thresh), " markers failed HWE test.")
+    if(any(hwe < hwe.thresh))
+        warning(sum(hwe < hwe.thresh), " markers failed HWE test.")
 
 ##### check for allele flips later on in the process #####
 }

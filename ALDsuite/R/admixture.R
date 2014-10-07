@@ -4,7 +4,7 @@
 # BSP CCR Genetics Core at Frederick National Laboratory for Cancer Research
 # SAIC-Frederick, Inc
 # Created September 10, 2012
-# Last Modified September 12, 2014
+# Last Modified October 7, 2014
 
 # see documentation for details on these arguments
 admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, burn = 100,
@@ -16,8 +16,38 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                       bad.marker = NULL, male.het.X = 1, fast = FALSE, A0 = NULL, Ak = NULL)
 {
 
+######### haplo/geno-type formatting #########
 
-### QC checks on data formatting and genetic data
+    if(!is.null(haps) & is.null(geno))
+    {
+        tmp <- array(0, dim = c(dim(haps)[1] / 2, dim(haps)[2], 2),
+                     dimnames = list(dimnames(haps)[[1]][1:(dim(haps)[1]/2) * 2 - 1],
+                                     dimnames(haps)[[2]], c('Mother', 'Father')))
+
+        tmp[,,1] <- haps[1:dim(tmp)[1] * 2 - 1,]
+        tmp[,,2] <- haps[1:dim(tmp)[1] * 2,]
+        haps <- tmp
+
+        geno <- apply(haps, 1:2, sum)
+    }
+
+    # check that dimnames, and IDs are consistent
+    if(!is.null(haps))
+    {
+        if(is.null(dimnames(haps)[[1]]))
+        {
+            if(!is.null(indiv.id))
+            {
+                dimnames(haps)[[1]] <- indiv.id
+            }else{
+                warning("Neither indiv.id nor dimnames of haps defined.")
+                dimnames(haps)[[1]] <- 1:dim(haps)[1]
+            }
+        }
+    }
+
+
+######### QC checks on data formatting and genetic data #########
     ald.qc(Pm.prior, haps, geno, gender, chr, pos, burn,
            iter, every, indiv.id, marker.id, pop.id,
            lambda, tau, omega, rand.seed,
@@ -73,20 +103,6 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
         d <- abs(d)
     }
 
-######### haplotypes #########
-
-    if(!is.null(haps))
-    {
-        tmp <- array(0, dim = c(dim(haps)[1] / 2, dim(haps)[2], 2),
-                     dimnames = list(dimnames(haps)[[1]][1:(dim(haps)[1]/2) * 2 - 1],
-                                     dimnames(haps)[[2]], c('Mother', 'Father')))
-
-        tmp[,,1] <- haps[1:dim(tmp)[1] * 2 - 1,]
-        tmp[,,2] <- haps[1:dim(tmp)[1] * 2,]
-        haps <- tmp
-
-        geno <- apply(haps, 1:2, sum)
-    }
 
 ######### starting estimate of ancestral allele frequencies #########
     P <- matrix(NA, nrow = length(Pm.prior), ncol = length(Pm.prior[[1]]$freq),
