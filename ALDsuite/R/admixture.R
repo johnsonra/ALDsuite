@@ -355,9 +355,17 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
         clusterExport(cl, list('hmm', 'haps', 'geno', 'P', 'lambda', 'lambdaX', 'd', 'chr', 'A0', 'Ak', 'AX',
                                'gender', 'sex.chr', 'dev', 'omega', 'omegaX', 'W', 'M', 'alpha', 'alphaX',
-                               'Pm', 'Pm.counts', 'Pm.prior', 'every', 'tau', 'verbose',
+                               'Pm', 'Pm.counts', 'Pm.prior', 'every', 'tau', 'verbose', 'cores',
                                'burnin', 'burn.lik', 'iter.lik', 'sigmaA', 'sigmaL', 'debug'),
                       envir = environment())
+
+        # get system pids for each subprocess
+        ids <- unlist(clusterEvalQ(cl, id <- Sys.getpid()))
+        clusterExport(cl, list('ids'))
+
+        # now relabel them from 1:cores
+        clusterEvalQ(cl, id <- which(id == ids))
+
     }else{
         stop.cl <- FALSE
     }
@@ -376,13 +384,18 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
         for(supercyc in 1:(nburn / every))
         {
-            print(supercyc)
-
             if(cores > 1)
             {
                 clusterExport(cl, list('supercyc'), envir = environment())
+
+                if(verbose) # report on progress
+                    invisible(sapply(clusterEvalQ(cl, (supercyc - 1) * cores + id), cat, '\n'))
+
                 invisible(clusterEvalQ(cl, eval(hmm)))
             }else{
+
+                if(verbose) # report on progress
+                    cat(supercyc, '\n')
 
                 eval(hmm, envir = environment())
 
@@ -580,6 +593,8 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
             {
                 invisible(clusterApplyLB(cl, 1:(iter / every), function(supercyc) eval(hmm, envir = globalenv())))
             }else{
+
+                # progress reports not yet working for parallel version
                 invisible(clusterEvalQ(cl, for(supercyc in 1:(niter / every)) eval(hmm)))
             }
 
@@ -609,7 +624,8 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
             # running things serially here
             for(supercyc in 1:(niter / every))
             {
-                print(supercyc)
+                if(verbose) # report on progress
+                    cat(supercyc, '\n')
 
                 eval(hmm, envir = environment())
 
@@ -824,7 +840,6 @@ admixture.setup <- function(...)
     marker.geno.check = args$marker.geno.check
     hwe.thresh = args$hwe.thresh
     bad.indiv = args$bad.indiv
-    bad.marker = args$bad.marker
     male.het.X = args$male.het.X
     fast = args$fast
 
