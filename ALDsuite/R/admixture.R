@@ -13,7 +13,7 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                       cores = detectCores(), cl = NULL, dev = FALSE, verbose = TRUE,
                       debug = FALSE, sex.chr = 23, indiv.geno.check = 0.98,
                       marker.geno.check = .98, hwe.thresh = 1e-4, bad.indiv = NULL,
-                      bad.marker = NULL, male.het.X = 1, fast = FALSE, A0 = NULL, Ak = NULL)
+                      male.het.X = 1, fast = FALSE, A0 = NULL, Ak = NULL, run.checks = TRUE)
 {
 
 ######### haplo/geno-type formatting #########
@@ -48,13 +48,14 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
 
 ######### QC checks on data formatting and genetic data #########
-    ald.qc(Pm.prior, haps, geno, gender, chr, pos, burn,
-           iter, every, indiv.id, marker.id, pop.id,
-           lambda, tau, omega, rand.seed,
-           cores, cl, dev, verbose,
-           debug, sex.chr, indiv.geno.check,
-           marker.geno.check, hwe.thresh, bad.indiv,
-           bad.marker, male.het.X, fast, A0, Ak)
+    if(run.checks)
+        ald.qc(Pm.prior, haps, geno, gender, chr, pos, burn,
+               iter, every, indiv.id, marker.id, pop.id,
+               lambda, tau, omega, rand.seed,
+               cores, cl, dev, verbose,
+               debug, sex.chr, indiv.geno.check,
+               marker.geno.check, hwe.thresh, bad.indiv,
+               bad.marker, male.het.X, fast, A0, Ak)
 
 
 #########
@@ -350,11 +351,11 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
         clusterSetRNGStream(cl, rand.seed)
 
-        invisible(clusterEvalQ(cl, library(mald)))
+        invisible(clusterEvalQ(cl, library(ALDsuite)))
 
         clusterExport(cl, list('hmm', 'haps', 'geno', 'P', 'lambda', 'lambdaX', 'd', 'chr', 'A0', 'Ak', 'AX',
                                'gender', 'sex.chr', 'dev', 'omega', 'omegaX', 'W', 'M', 'alpha', 'alphaX',
-                               'Pm', 'Pm.counts', 'Pm.prior', 'every', 'tau', 'verbose', 'O',
+                               'Pm', 'Pm.counts', 'Pm.prior', 'every', 'tau', 'verbose',
                                'burnin', 'burn.lik', 'iter.lik', 'sigmaA', 'sigmaL', 'debug'),
                       envir = environment())
     }else{
@@ -429,7 +430,8 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                 }
             }
 
-            if(cores > 1 & supercyc != nburn) # this is for the *next burn-in* sample (i.e. skip the last cycle)
+            # this is for the *next burn-in* sample (i.e. skip the last cycle)
+            if(cores > 1 & supercyc != max(1:(nburn / every)))
             {
                 ##### get local state for each chain #####
 
@@ -492,6 +494,8 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                 omega.r <- omega.r[[1]] / cores
                 lambda.r <- lambda.r[[1]] / cores
                 lambdaX.r <- lambdaX.r[[1]] / cores
+                alpha.r <- alpha.r[[1]] / cores
+                alphaX.r <- alphaX.r[[1]] / cores
                 P.r <- P.r[[1]] / cores
                 Pm.r <- Pm.r[[1]] / cores
                 tau.r <- tau.r[[1]] / cores
@@ -510,10 +514,10 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                 }
 
                 ##### update local proposal states #####
-                mixing <- supercyc / nburn # This is for the next cycle -- first time is essentially 1/0
+                mixing <- supercyc / max(1:(nburn/every)) # This is for the next cycle -- first time is close to 0
 
                 clusterExport(cl, list('Ak.r', 'AX.r', 'omega.r', 'omegaX.r', 'lambda.r',
-                                       'lambdaX.r', 'alpha.r', 'beta.r', 'alphaX.r', 'betaX.r',
+                                       'lambdaX.r', 'alpha.r', 'alphaX.r',
                                        'P.r', 'Pm.r', 'Pm.prior.r', 'tau.r', 'mixing'),
                               envir = environment())
 
@@ -528,8 +532,6 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                                  lambda <- mixing*lambda + (1 - mixing)*lambda.r
                                  lambda.X <- mixing*lambdaX + (1 - mixing)*lambdaX.r
 
-                                 beta <- mixing*beta + (1 - mixing)*beta.r
-                                 betaX <- mixing*betaX + (1 - mixing)*betaX.r
                                  alpha <- mixing*alpha + (1 - mixing)*alpha.r
                                  alphaX <- mixing*alphaX + (1 - mixing)*alphaX.r
 
@@ -553,7 +555,6 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                                          }
                                      }
                                  }
-
                              }))
             }
         }
@@ -577,9 +578,9 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
             # do all samples for each chain
             if(fast) # may not be reproducible, could be a lot faster
             {
-                invisible(clusterApplyLB(cl, 1:iter, function(supercyc) eval(hmm, envir = globalenv())))
+                invisible(clusterApplyLB(cl, 1:(iter / every), function(supercyc) eval(hmm, envir = globalenv())))
             }else{
-                invisible(clusterEvalQ(cl, for(supercyc in 1:niter) eval(hmm)))
+                invisible(clusterEvalQ(cl, for(supercyc in 1:(niter / every)) eval(hmm)))
             }
 
             # get results from each chain
@@ -598,7 +599,6 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                 final$omega <- final$omega + chains[[i]]$omega
                 final$omegaX <- final$omegaX + chains[[i]]$omegaX
                 final$alpha <- final$alpha + chains[[i]]$alpha
-                final$beta <- final$beta + chains[[i]]$beta
                 final$alphaX <- final$alphaX + chains[[i]]$alphaX
                 final$tau <- final$tau + chains[[i]]$tau
                 final$sigmaA <- final$sigmaA + chains[[i]]$sigmaA
@@ -661,9 +661,9 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
         # divisor (this could be different if fast == TRUE)
         if(fast)
         {
-            divisor <- iter / every
+            divisor <- floor(iter / every)
         }else{
-            divisor <- cores * niter / every
+            divisor <- cores * floor(niter / every)
         }
 
         final$A0 <- final$A0 / divisor
