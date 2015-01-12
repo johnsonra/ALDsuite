@@ -314,8 +314,7 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                                ncvar_def("tau", "hyper", list(dimHyper2, dimIter), -1),
                                ncvar_def("sigmaA", "hyper", list(dimPops, dimIter), -1),
                                ncvar_def("sigmaL", "hyper", list(dimIter), -1),
-                               ncvar_def("BetasUp", "hyper", list(dimBetas, dimMarkers, dimPops, dimIter), -1),
-                               ncvar_def("BetasDown", "hyper", list(dimBetas, dimMarkers, dimPops, dimIter), -1))
+                               ncvar_def("PCRbetas", "hyper", list(dimBetas, dimMarkers, dimPops, dimIter), -1))
 
             # create and open file
             nc.debug <- nc_create("mald.debug.nc", debug.vars)
@@ -422,23 +421,15 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
                     for(j in 1:length(Pm.prior))
                     {
-                        for(k in 1:length(Pm.prior[[1]]$upstream))
+                        for(l in 1:length(Pm.prior[[j]]$model))
                         {
-                            tmp <- rep(0, maxbetas)
-                            b <- Pm.prior[[j]]$upstream[[k]]$betas
-                            if(length(b) > 0)
-                                tmp[1:length(b)] <- b
-                            ncvar_put(nc.debug, "BetasUp", tmp, start = c(1, j, k, supercyc),
-                                      count = c(maxbetas, 1, 1, 1))
-
-                            tmp <- rep(0, maxbetas)
-                            b <- Pm.prior[[j]]$downstream[[k]]$betas
-                            if(length(b) > 0)
-                                tmp[1:length(b)] <- b
-                            ncvar_put(nc.debug, "BetasDown", tmp, start = c(1, j, k, supercyc),
-                                      count = c(maxbetas, 1, 1, 1))
+                            if(!is.null(Pm.prior[[j]]$model[[l]]$betas.p))
+                                ncvar_put(nc.debug, "PCRbetas", Pm.prior[[j]]$model[[l]]$betas.p,
+                                          start = c(1, j, l, supercyc),
+                                          count = c(length(Pm.prior[[j]]$model[[l]]$betas.p), 1, 1, 1))
                         }
                     }
+
                     nc.debug <- nc_close(nc.debug)
                 }
             }
