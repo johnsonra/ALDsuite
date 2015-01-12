@@ -4,7 +4,7 @@
 # BSP CCR Genetics Core at Frederick National Laboratory for Cancer Research
 # SAIC-Frederick, Inc
 # Created September 10, 2012
-# Last Modified October 7, 2014
+# Last Modified January 12, 2015
 
 # see documentation for details on these arguments
 admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, burn = 100,
@@ -287,7 +287,7 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
         if(!tmp)
         {
-            warning("ncdf package required to run in debug mode.")
+            warning("ncdf4 package required to run in debug mode.")
             debug <- FALSE
         }else{
             # set up dimensions
@@ -309,7 +309,7 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                                ncvar_def("Pm", "frequency", list(dimMarkers, dimPops, dimIter), -1),
                                ncvar_def("omega", "hyper", list(dimHyper2, dimIter), -1),
                                ncvar_def("omegaX", "hyper", list(dimIter), -1),
-                               ncvar_def("alpha", "hyper", list(dimHyper2, dimIter), -1), # not really parents, but has two anyway
+                               ncvar_def("alpha", "hyper", list(dimHyper2, dimIter), -1),
                                ncvar_def("alphaX", "hyper", list(dimParents, dimIter), -1),
                                ncvar_def("tau", "hyper", list(dimHyper2, dimIter), -1),
                                ncvar_def("sigmaA", "hyper", list(dimPops, dimIter), -1),
