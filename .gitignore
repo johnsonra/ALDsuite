@@ -10,3 +10,4 @@ data/
 *.Rhistory
 *.xcodeproj
 *.xcodeproj/
+Icon*
