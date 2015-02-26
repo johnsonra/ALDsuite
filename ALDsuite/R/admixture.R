@@ -1,10 +1,8 @@
 # admixture.R
 # Infer ancestry estimates for a data set
 # Randall Johnson
-# BSP CCR Genetics Core at Frederick National Laboratory for Cancer Research
-# SAIC-Frederick, Inc
-# Created September 10, 2012
-# Last Modified January 12, 2015
+# CCR Collaborative Bioinformatics Resource at Frederick National Laboratory for Cancer Research
+# Leidos Biomedical Research, Inc
 
 # see documentation for details on these arguments
 admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, burn = 100,
@@ -295,7 +293,7 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
             dimMarkers <- ncdim_def("Markers", "count", 1:dim(haps)[2])
             dimParents <- ncdim_def("Parents", "count", 1:2)
             dimPops <- ncdim_def("Pops", "count", 1:dim(Pm.counts)[3])
-            dimIter <- ncdim_def("Iter", "count", 1:(burn + iter))
+            dimIter <- ncdim_def("Iter", "count", 1:((burn + iter) / every))
             dimHyper2 <- ncdim_def("Hyper2", "count", 1:2) # for hyper parameters with two values (like omega)
             dimBetas <- ncdim_def("Betas", "count", 1:maxbetas)
 
