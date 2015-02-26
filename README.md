@@ -5,12 +5,14 @@ Suite of tools for inferring Admixture Linkage Disequilibrium
 and testing disease association hypotheses. A companion package,
 ALDdata, is also available at http://github.com/johnsonra/ALDdata.
 
-WARNING - this is still an early beta version and under heavy development
-
 Versions
 ========
 
-0.4.2 - Current development version
+0.4.3 - Current development branch
+
+0.4.2 - February 26, 2015
+
+* Release associated with publication
 
 0.4.1 - May 22, 2014
 
