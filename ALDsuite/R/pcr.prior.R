@@ -1,195 +1,9 @@
 # pcr.prior.R
 # Function to set up Principal Component Regression prior coefficients
 # Randall Johnson
-# BSP CCR Genetics Core at Frederick National Laboratory
-# SAIC-Frederick, Inc
-# Created August 26, 2013
-# Last Modified December 10, 2013
+# CCR Collaborative Bioinformatics Resource
+# Leidos Biomedical Research, Inc
 
-# snps = vector of rsnumbers in our sample
-# pops = vector of prior population ids (i.e. 'CEU', 'YRI', ...)
-# thresh = percentage of variation we desire the PCs to explain
-## setup.prior.dev <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = NULL, cM.linked = 0.1,
-##                         window = 0.1, phased = FALSE, dev = FALSE, n.samp = 100)
-## {
-##     data(hapmap, envir = environment())
-
-##     hapmap <- subset(hapmap, rs %in% snps)
-##     hapmap <- hapmap[order(hapmap$chr, hapmap$pos),] # should already be ordered, but just in case...
-
-##     # if anchors are not specified, choose them
-##     if(is.null(anchors))
-##     {
-##         anchors <- character()
-
-##         ## score <- function(x) apply(cbind(abs(x*log(x)), 0), 1, max, na.rm = TRUE)
-##         score <- function(x) -(x - .5)^2 + .25
-
-##         # calculate aims/selection score
-##         hapmap$score <- 0
-
-##         for(k1 in 1:(length(pops) - 1)) # comparisons with self aren't helpful
-##         {
-##             fa <- paste('f', tolower(pops[k1]), sep = '.')
-##             for(k2 in (k1+1):length(pops))
-##             {
-##                 fb <- paste('f', tolower(pops[k2]), sep = '.')
-##                 hapmap$score <- hapmap$score + abs(hapmap[[fa]] - hapmap[[fb]]) *
-##                                ( score(hapmap[[fa]]) + score(hapmap[[fb]]) )
-##             }
-##         }
-
-
-##         # drop any uninformative markers
-##         hapmap <- subset(hapmap, score > 0)
-
-
-##         # pack the map with spacing of about at least cM.linked cM
-##         for(c in unique(hapmap$chr))
-##         {
-##             candidates <- subset(hapmap, chr == c)
-##             while(dim(candidates)[1] > 0)
-##             {
-##                 pick <- candidates$rs[which.max(candidates$score)]
-
-##                 candidates <- subset(candidates, abs(cM - subset(candidates, rs == pick)$cM) > window)
-
-##                 anchors <- c(anchors, pick)
-##             }
-##         }
-
-##         # reorder anchors correctly
-##         anchors <- hapmap$rs[hapmap$rs %in% anchors]
-##     }
-
-##     # make general framework for Pm.prior
-##     retval <- lapply(anchors, function(x) list(freq = numeric(),
-##                                                n = numeric()))
-##     names(retval) <- anchors
-
-
-##     # generalize another time!
-##     data(yri20, envir = environment())
-##     yri <- phased
-##     LD1 <- LD
-
-##     data(ceu20, envir = environment())
-##     ceu <- phased
-##     LD2 <- LD
-
-##     for(rs in anchors)
-##     {
-##         # setup freq and n
-##         retval[[rs]]$freq['YRI'] <- mean(yri[,rs])
-##         retval[[rs]]$freq['CEU'] <- mean(ceu[,rs])
-##         retval[[rs]]$n['YRI'] <- dim(yri)[1]
-##         retval[[rs]]$n['CEU'] <- dim(ceu)[1]
-
-##         # pick linked alleles
-##         hiLD <- unique(c(subset(LD1, rs1 == rs)$rs2, subset(LD1, rs2 == rs)$rs1,
-##                          subset(LD2, rs1 == rs)$rs2, subset(LD2, rs2 == rs)$rs1))
-##         loc <- hapmap$cM[hapmap$rs == rs]
-##         linked <- unique(c(hiLD, subset(hapmap, abs(cM - loc) <= window & cM != loc)$rs))
-##         ## linked <- subset(hapmap, abs(cM - loc) <= window & cM != loc & !rs %in% hiLD)$rs
-##         linked <- linked[linked %in% hapmap$rs]
-
-##         # set up model
-##         tmp <- range(subset(hapmap, rs %in% c(linked) | cM == loc)$cM)
-##         d <- tmp[2] - tmp[1]
-
-##         retval[[rs]]$model <- list(YRI = list(linked = linked,
-##                                               d = d,
-##                                               eig = NULL,
-##                                               betas = NULL,
-##                                               vcv = NULL,
-##                                               hessian = NULL),
-##                                    CEU = list(linked = linked,
-##                                               d = d,
-##                                               eig = NULL,
-##                                               betas = NULL,
-##                                               vcv = NULL,
-##                                               hessian = NULL))
-
-##         # do pca of ceu and yri
-##         if(length(linked) == 1)
-##         {
-##             lreg <- logitreg(yri[,rs], matrix(yri[,linked]))
-##             retval[[rs]]$model[['YRI']]$eig <- 1
-##             retval[[rs]]$model[['YRI']]$betas <- lreg$par
-##             retval[[rs]]$model[['YRI']]$vcv <- lreg$vcv
-##             retval[[rs]]$model[['YRI']]$hessian <- lreg$hessian
-
-##             if(any(diag(retval[[rs]]$model$YRI$vcv) <= 0) | any(!is.finite(retval[[rs]]$model$YRI$vcv)))
-##             {
-##                 retval[[rs]]$model$YRI$hessian <- rwish(2, diag(nrow = nrow(retval[[rs]]$model$YRI$hessian)))
-##                 retval[[rs]]$model$YRI$vcv <- solve(retval[[rs]]$model$YRI$hessian)
-##             }
-
-##             lreg <- logitreg(ceu[,rs], matrix(ceu[,linked]))
-##             retval[[rs]]$model[['CEU']]$eig <- 1
-##             retval[[rs]]$model[['CEU']]$betas <- lreg$par
-##             retval[[rs]]$model[['CEU']]$vcv <- lreg$vcv
-##             retval[[rs]]$model[['CEU']]$hessian <- lreg$hessian
-
-##             if(any(diag(retval[[rs]]$model$CEU$vcv) <= 0) | any(!is.finite(retval[[rs]]$model$CEU$vcv)))
-##             {
-##                 retval[[rs]]$model$CEU$hessian <- rwish(2, diag(nrow = nrow(retval[[rs]]$model$CEU$hessian)))
-##                 retval[[rs]]$model$CEU$vcv <- solve(retval[[rs]]$model$CEU$hessian)
-##             }
-
-##         }
-##         if(length(linked) > 1)
-##         {
-##             # PCA
-##             cormat <- cor(rbind(ceu[,linked], yri[,linked]), use = 'pairwise.complete.obs')
-##             cormat[!is.finite(cormat)] <- 0
-##             eig <- eigen(cormat)
-
-##             if(sum(eig$values) == 0)
-##             {
-##                 retval[[rs]]$model$YRI$linked <- character()
-##                 retval[[rs]]$model$CEU$linked <- character()
-##             }else{
-##                 # pick PCs
-##                 npcs <- min(c(sum(cumsum(eig$values) / sum(eig$values) < thresh) + 1,
-##                               length(eig$values), maxpcs))
-
-##                 retval[[rs]]$model$YRI$eig <- eig$vectors[,1:npcs]
-##                 retval[[rs]]$model$CEU$eig <- eig$vectors[,1:npcs]
-
-##                 # Model PCs
-##                 pcs <- yri[,linked] %*% retval[[rs]]$model$YRI$eig
-
-##                 lreg <- logitreg(yri[,rs], pcs)
-##                 retval[[rs]]$model$YRI$betas <- lreg$par
-##                 retval[[rs]]$model$YRI$vcv <- lreg$vcv
-##                 retval[[rs]]$model$YRI$hessian <- lreg$hessian
-
-##                 if(any(diag(retval[[rs]]$model$YRI$vcv) <= 0) | any(!is.finite(retval[[rs]]$model$YRI$vcv)))
-##                 {
-##                     retval[[rs]]$model$YRI$hessian <- rwish(2, diag(nrow = nrow(retval[[rs]]$model$YRI$hessian)))
-##                     retval[[rs]]$model$YRI$vcv <- solve(retval[[rs]]$model$YRI$hessian)
-##                 }
-
-
-##                 pcs <- ceu[,linked] %*% retval[[rs]]$model$CEU$eig
-
-##                 lreg <- logitreg(ceu[,rs], pcs)
-##                 retval[[rs]]$model$CEU$betas <- lreg$par
-##                 retval[[rs]]$model$CEU$vcv <- lreg$vcv
-##                 retval[[rs]]$model$CEU$hessian <- lreg$hessian
-
-##                 if(any(diag(retval[[rs]]$model$CEU$vcv) <= 0) | any(!is.finite(retval[[rs]]$model$CEU$vcv)))
-##                 {
-##                     retval[[rs]]$model$CEU$hessian <- rwish(2, diag(nrow = nrow(retval[[rs]]$model$CEU$hessian)))
-##                     retval[[rs]]$model$CEU$vcv <- solve(retval[[rs]]$model$CEU$hessian)
-##                 }
-##             }
-##         }
-##     }
-
-##     return(retval)
-## }
 
 setup.prior.dev <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = NULL, cM.linked = 0.1,
                         window = 0.1, phased = FALSE, dev = FALSE, n.samp = 100)
@@ -204,7 +18,6 @@ setup.prior.dev <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = N
     {
         anchors <- character()
 
-        ## score <- function(x) apply(cbind(abs(x*log(x)), 0), 1, max, na.rm = TRUE)
         score <- function(x) -(x - .5)^2 + .25
 
         # calculate aims/selection score
@@ -372,38 +185,26 @@ setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6, cM
     {
         anchors <- character()
 
-        ## score <- function(x) apply(cbind(abs(x*log(x)), 0), 1, max, na.rm = TRUE)
         score <- function(x) -(x - .5)^2 + .25
 
         # calculate aims/selection score
         hapmap$score <- 0
 
-        if(dev)
+        for(k1 in 1:(length(pops) - 1)) # comparisons with self aren't helpful
         {
-            print('picking common markers')
-            for(k in 1:length(pops))
+            fa <- paste('f', tolower(pops[k1]), sep = '.')
+            for(k2 in (k1+1):length(pops))
             {
-                f <- hapmap[[paste('f', tolower(pops[[k]]), sep = '.')]]
-                f <- f + ifelse(f > 0.5, -0.001, 0.001)
-
-                hapmap$score <- hapmap$score + log(f) + log(1 - f)
+                fb <- paste('f', tolower(pops[k2]), sep = '.')
+                hapmap$score <- hapmap$score + abs(hapmap[[fa]] - hapmap[[fb]]) *
+                    (score(hapmap[[fa]]) + score(hapmap[[fb]]))
             }
-        }else{
-            for(k1 in 1:(length(pops) - 1)) # comparisons with self aren't helpful
-            {
-                fa <- paste('f', tolower(pops[k1]), sep = '.')
-                for(k2 in (k1+1):length(pops))
-                {
-                    fb <- paste('f', tolower(pops[k2]), sep = '.')
-                    hapmap$score <- hapmap$score + abs(hapmap[[fa]] - hapmap[[fb]]) *
-                        (score(hapmap[[fa]]) + score(hapmap[[fb]]))
-                }
-            }
-
-
-            # drop any uninformative markers
-            hapmap <- subset(hapmap, score > 0)
         }
+
+
+        # drop any uninformative markers
+        hapmap <- subset(hapmap, score > 0)
+
 
         # pack the map with spacing of about at least cM.linked cM
         for(c in unique(hapmap$chr))
