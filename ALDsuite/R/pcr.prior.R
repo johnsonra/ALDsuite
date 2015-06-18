@@ -152,6 +152,7 @@ setup.prior.dev <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = N
                 yri.pcs <- yri[,linked] %*% retval[[rs]]$model$YRI$eig
                 ceu.pcs <- ceu[,linked] %*% retval[[rs]]$model$YRI$eig
 
+                # race ~ PCs of genotypes
                 y <- c(rep(1, dim(yri)[1]), rep(0, dim(ceu)[1]))
                 x <- rbind(yri.pcs, ceu.pcs)
 
@@ -229,13 +230,20 @@ setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6, cM
                                                n = numeric()))
     names(retval) <- anchors
 
-    if(phased)
+
+    ######### Set up priors for phased data #########
+    if(!unphased)
     {
-        for(k in pops)
+        # this is where the phased haplotype training data will reside
+        train <- list(dat = NULL)
+
+        for(i in unique(hapmap$chr))
         {
-            for(i in unique(hapmap$chr))
+            hapmap.sub <- subset(hapmap, chr == i)
+
+            ### Collect Traning Data for Chromosome i ###
+            for(k in pops)
             {
-                hapmap.sub <- subset(hapmap, chr == i)
                 if(k == 'CHB+JPT')
                 {
                     eval(parse(text = paste('data(chb', i, ', envir = environment())', sep = '')))
@@ -253,9 +261,16 @@ setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6, cM
                 phased <- phased[,hapmap.sub$rs]
                 LD <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
 
-                for(rs in hapmap.sub$rs[hapmap.sub$rs %in% anchors])
-                    retval[[rs]] <- pcr.prior.phased(retval[[rs]], rs, toupper(k), hapmap.sub, phased, LD,
-                                                     thresh, maxpcs, cM.linked, window, dev)
+                train$dat <- rbind(train$dat, cbind(which(pops == k), phased[,hapmap.sub$rs]))
+                train[[k]] <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased)))
+            }
+
+
+            ### Infer Priors ###
+            for(rs in hapmap.sub$rs[hapmap.sub$rs %in% anchors])
+                tmp <- pca.phased(train, rs.cur, map, thresh, maxpcs, cM.linked, window)
+                retval[[rs]] <- pcr.prior.phased(tmp, rs, toupper(k), hapmap.sub, phased, LD,
+                                                 thresh, maxpcs, cM.linked, window, dev)
 
             }
         }
@@ -318,38 +333,161 @@ load.pop <- function(chr, k, rsList)
     return(list(phased = phased, LD = LD))
 }
 
-# rs = the SNP id we are calculating the priors for
+# train = training data (list with one element per population, each with phased and LD data)
+# rs.cur = the SNP id we are calculating the priors for
 # map = subset of hapmap containing all sampled SNPs
-# phased = correct set of phased chromosomes
-# LD = correct set of LD measures
 # thresh = percent of variation we want the PCs to explain
+# maxpcs =
+# cM.linked =
+# window =
+pca.phased <- function(train, rs.cur, map, thresh, maxpcs, cM.linked, window)
+{
+    pops <- names(train)[-1]
+
+    # figure out what is linked in any population (including rs.cur)
+    linked <- subset(map, abs(cM - map$cM[map$rs == rs.cur]) <= window)$rs # close by
+
+    # add in any markers with high LD
+    for(k in pops)
+    {
+        linked <- unique(c(linked, subset(train[[k]], rs2 == rs.cur)$rs1,
+                                   subset(train[[k]], rs1 == rs.cur)$rs2))
+    }
+
+    linked <- linked[linked %in% hapmap$rs] # just to be sure...
+
+    # set up model list
+    model <- list(freq = numeric(),
+                  n = numeric(),
+                  linked = linked,
+                  d = diff(range(subset(map, rs %in% linked)$cM)), # size of block in cM
+                  eig = NULL,
+                  betas = NULL,
+                  vcv = NULL,
+                  hessian = NULL,
+                  train = cbind(train$dat[,1], train$dat[,linked]))
+
+    for(k in 1:length(pops))
+    {
+        model$freq[pops[k]] <- mean(train[train$dat$race == p,rs.cur])
+        model$n[pops[k]] <- sum(train$dat$race == p)
+    }
+
+    # if only one marker, no need to calculate eigenvectors
+    if(length(linked) == 1)
+    {
+        model$eig <- 1
+    }else{
+    # PCA for all linked markers
+        cormat <- cor(model$train[,-1], use = 'pairwise.complete.obs')
+        cormat[!is.finite(cormat)] <- 0
+
+        eig <- eigen(cormat)
+
+        if(sum(eig$values) == 0)
+        {
+            stop('deal with this')
+        }else{
+            # pick PCs
+            npcs <- min(c(sum(cumsum(eig$values) / sum(eig$values) < thresh) + 1,
+                          length(eig$values), maxpcs))
+
+            # save PCs
+            model$eig <- eig$vectors[,1:npcs]
+        }
+    }
+
+    return(model)
+}
+
+pca.unphased <- function(train, rs.cur, map, thresh, maxpcs, cM.linked, window, n.samp)
+{
+    pops <- names(train)[-1]
+
+    # figure out what is linked in any population (including rs.cur)
+    linked <- subset(map, abs(cM - map$cM[map$rs == rs.cur]) <= window)$rs # close by
+
+    # add in any markers with high LD
+    for(k in pops)
+    {
+        linked <- unique(c(linked, subset(train[[k]], rs2 == rs.cur)$rs1,
+                                   subset(train[[k]], rs1 == rs.cur)$rs2))
+    }
+
+    linked <- linked[linked %in% hapmap$rs] # just to be sure...
+
+    # set up model list
+    model <- list(freq = numeric(),
+                  n = numeric(),
+                  linked = linked,
+                  d = diff(range(subset(map, rs %in% linked)$cM)), # size of block in cM
+                  eig = NULL,
+                  betas = NULL,
+                  vcv = NULL,
+                  hessian = NULL)
+
+    for(k in 1:length(pops))
+    {
+        model$freq[pops[k]] <- mean(train[train$dat$race == p,rs.cur]) / 2
+        model$n[pops[k]] <- sum(train$dat$race == p)
+    }
+
+    # if only one marker, no need to calculate eigenvectors
+    if(length(linked) == 1)
+    {
+        model$eig <- 1
+    }else{
+        # combine chromosomes to simulate new people (these will have no crossovers --
+        #   i.e. one chromosome from each ancestral population -- or two from one population)
+        genos <- matrix(nrow = 0, ncol = dim(train$dat)[2],
+                        dimnames = list(character(), colnames(train$dat)))
+
+        for(k1 in 1:length(pops))
+        {
+            for(k2 in k1:length(pops))
+            {
+                pick1 <- sample((1:dim(train$dat)[1])[train$dat[,1] == k1], size = n.samp, replace = TRUE)
+                pick2 <- sample((1:dim(train$dat)[1])[train$dat[,1] == k2], size = n.samp, replace = TRUE)
+
+                # calculate genotypes
+                pick <- cbind(as.numeric(paste(k1, k2, sep = '')),
+                              train$dat[pick1,linked] + train$dat[pick2,linked])
+
+                # add newly simulated individuals to the unphased data set
+                genos <- rbind(genos, pick)
+            }
+        }
+
+        # replace phased data with unphased data
+        model$train <- genos
+
+        # PCA for all linked markers
+        cormat <- cor(model$train[,-1], use = 'pairwise.complete.obs')
+        cormat[!is.finite(cormat)] <- 0
+
+        eig <- eigen(cormat)
+
+        if(sum(eig$values) == 0)
+        {
+            stop('deal with this')
+        }else{
+            # pick PCs
+            npcs <- min(c(sum(cumsum(eig$values) / sum(eig$values) < thresh) + 1,
+                          length(eig$values), maxpcs))
+
+            # save PCs
+            model$eig <- eig$vectors[,1:npcs]
+        }
+    }
+
+    return(model)
+}
+
 pcr.prior.phased <- function(retval, rs.cur, pop, map, phased, LD, thresh, maxpcs, cM.linked, window, dev)
 {
     retval$freq[pop] <- mean(phased[,rs.cur])
     retval$n[pop] <- dim(phased)[1]
 
-    # figure out what is linked
-    hiLD <- character()#c(subset(LD, rs2 == rs.cur)$rs1, subset(LD, rs1 == rs.cur)$rs2)
-
-    linked <- unique(c(subset(LD, rs2 == rs.cur)$rs1,
-                       subset(LD, rs1 == rs.cur)$rs2,
-                       subset(map, abs(cM - map$cM[map$rs == rs.cur]) <= window &
-                                   !rs %in% c(rs.cur, hiLD))$rs))
-
-
-    # drop markers outside of cM.linked
-    ## drop <- subset(map, abs(cM - map$cM[map$rs == rs.cur]) > cM.linked & rs %in% linked)
-    ## linked <- linked[!linked %in% drop]
-
-    tmp <- range(subset(map, rs %in% c(rs.cur, linked))$cM)
-
-    # model
-    model <- list(linked = linked,
-                  d = tmp[2] - tmp[1], # size of block in cM
-                  eig = NULL,
-                  betas = NULL,
-                  vcv = NULL,
-                  hessian = NULL)
 
     if(length(linked) == 0)
     {
