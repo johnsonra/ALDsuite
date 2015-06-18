@@ -5,9 +5,12 @@
 # Leidos Biomedical Research, Inc
 
 
-setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6, cM.linked = 0.1,
-                        window = 0.1, phased = FALSE, n.samp = 100)
+setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6,
+                        window = 0.1, unphased = TRUE, n.samp = 300)
 {
+    if(!require(ALDdata))
+        stop('ALDdata package required for setup.prior()')
+
     data(hapmap, envir = environment())
 
     hapmap <- subset(hapmap, rs %in% snps)
@@ -99,9 +102,7 @@ setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6, cM
         for(rs in hapmap.sub$rs[hapmap.sub$rs %in% anchors])
         {
             ### Calculate PC Loadings ###
-            tmp <- pca.setup(train, rs.cur, map, thresh, maxpcs, window, n.samp, unphased)
-            tmp <- pcr.prior.phased(tmp, rs, toupper(k), hapmap.sub, phased, LD,
-                                    thresh, maxpcs, cM.linked, window, dev)
+            tmp <- pca.setup(train, rs, hapmap.sub, thresh, maxpcs, window, n.samp, unphased)
 
             ### PC Regression ###
             retval[[rs]] <- pcr.prior(tmp)
@@ -160,7 +161,7 @@ pca.setup <- function(train, rs.cur, map, thresh, maxpcs, window, n.samp, unphas
                                    subset(train[[k]], rs1 == rs.cur)$rs2))
     }
 
-    linked <- linked[linked %in% hapmap$rs] # just to be sure...
+    linked <- linked[linked %in% map$rs] # just to be sure...
 
     # set up model list
     model <- list(freq = numeric(),
@@ -171,12 +172,12 @@ pca.setup <- function(train, rs.cur, map, thresh, maxpcs, window, n.samp, unphas
                   betas = NULL,
                   vcv = NULL,
                   hessian = NULL,
-                  train = nothere) ############
+                  train = cbind(train$dat[,1], train$dat[,linked]))
 
     for(k in 1:length(pops))
     {
-        model$freq[pops[k]] <- mean(train[train$dat$race == k, rs.cur]) / 2
-        model$n[pops[k]] <- sum(train$dat$race == k)
+        model$freq[pops[k]] <- mean(train$dat[train$dat[,1] == k, rs.cur]) / 2
+        model$n[pops[k]] <- sum(train$dat[,1] == k)
     }
 
     # if only one marker, no need to calculate eigenvectors
@@ -188,16 +189,16 @@ pca.setup <- function(train, rs.cur, map, thresh, maxpcs, window, n.samp, unphas
         {
             # combine chromosomes to simulate new people (these will have no crossovers --
             #   i.e. one chromosome from each ancestral population -- or two from one population)
-            genos <- matrix(nrow = 0, ncol = dim(train$dat)[2],
-                            dimnames = list(character(), colnames(train$dat)))
+            genos <- matrix(nrow = 0, ncol = dim(model$train)[2],
+                            dimnames = list(character(), colnames(model$train)))
 
             for(k1 in 1:length(pops))
             {
                 for(k2 in k1:length(pops))
                 {
-                    pick1 <- sample((1:dim(train$dat)[1])[train$dat[,1] == k1],
+                    pick1 <- sample((1:dim(model$train)[1])[model$train[,1] == k1],
                                     size = n.samp, replace = TRUE)
-                    pick2 <- sample((1:dim(train$dat)[1])[train$dat[,1] == k2],
+                    pick2 <- sample((1:dim(model$train)[1])[model$train[,1] == k2],
                                     size = n.samp, replace = TRUE)
 
                     # calculate genotypes
@@ -241,19 +242,31 @@ pcr.prior <- function(retval)
     groups <- unique(retval$train[,1])
 
     # regression
+    if(dim(retval$train)[2] == 2)
+    {
+        X <- as.matrix(retval$train[,-1])
+    }else{
+        X <- retval$train[,-1]
+    }
+
     if(length(groups) == 2)
     {
         y <- retval$train[,1] == groups[1]
 
-        lreg <- logitreg(y, matrix(retval$train[,-1]))
+        lreg <- logitreg(y, X %*% retval$eig)
+
+        retval$betas <- t(t(lreg$par)) # collect and name betas
+        colnames(retval$betas) <- names(retval$freq)[1]
     }else{
         y <- sapply(groups, function(i) retval$train[,1] == i)
 
-        lreg <- multilogitreg(y, retval$train[,-1])
+        lreg <- multilogitreg(y, X %*% retval$eig)
+
+        retval$betas <- lreg$par # collect and name betas
+        colnames(retval$betas) <- groups[1:(length(groups) - 1)]
     }
 
-    # record results
-    retval$betas <- lreg$par
+    # collect variance/covariance and hessian matrices
     retval$vcv <- lreg$vcv
     retval$hessian <- lreg$hessian
 

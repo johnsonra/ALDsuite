@@ -1,7 +1,7 @@
 export(admixture, admixture.par,
 # prior population setup
-       setup.prior, pcr.prior.phased, pcr.prior.unphased,
-       logitreg, load.pop, multilogitreg, setup.prior.dev,
+       setup.prior, pcr.prior, pca.setup,
+       logitreg, load.pop, multilogitreg,
 # likelihoods
        P.recombination, P.gammas, P.gamma, P.a.gamma.gamma, P.gammas.a,
        P.a.gamma, P.gamma.aX, P.O, P.O2, logP.G.lambda.d,
