@@ -2,9 +2,6 @@
 testing
 testing/
 ALDsuite_0.*
-*.RData
-data
-data/
 *.so
 *.o
 *.history
