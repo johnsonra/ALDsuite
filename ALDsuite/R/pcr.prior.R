@@ -109,6 +109,9 @@ setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6,
         }
     }
 
+    # we don't need this anymore
+    retval$train <- NULL
+
     if(unphased)
     {
         class(retval) <- c('Pm.prior', 'unphased')

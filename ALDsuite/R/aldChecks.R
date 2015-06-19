@@ -194,9 +194,9 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
     if(any(names(Pm.prior) != marker.id))
         stop("Each marker in Pm.prior needs to be present in marker.id when not null.")
 
-    if(any(unlist(lapply(Pm.prior, length)) != 3) | # each marker should have 3 elements
-       length(table(unlist(lapply(Pm.prior, lapply, length)))) != 1) # each element should have length K
-        stop("Formatting error in Pm.prior detected.")
+    ## if(any(unlist(lapply(Pm.prior, length)) != 3) | # each marker should have 3 elements
+    ##    length(table(unlist(lapply(Pm.prior, lapply, length)))) != 1) # each element should have length K
+    ##     stop("Formatting error in Pm.prior detected.")
 
 
 ########## be sure gender is specified if anything in chr == sex.chr ##########

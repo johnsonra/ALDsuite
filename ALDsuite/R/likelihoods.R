@@ -159,7 +159,7 @@ P.gammas <- function(geno, P, Pm.prior, lambda, lambdaX, d, chr, A0, Ak, AX, gen
             ### P(gammas | a) ###
             if(haps)
             {
-                gammas[,j,,] <- P.a.gamma(gammas[,max(j-1, 1),,], geno, Pm.prior[[j]]$model,
+                gammas[,j,,] <- P.a.gamma(gammas[,max(j-1, 1),,], geno, Pm.prior[[j]],
                                           P[j,], Ak, lambda, d[j])
             }else{
                 # -- gammas.prev is ignored on the first time through --
@@ -178,7 +178,7 @@ P.gammas <- function(geno, P, Pm.prior, lambda, lambdaX, d, chr, A0, Ak, AX, gen
 
             if(haps)
             {
-                g.prev <- P.a.gamma(g.prev, geno, Pm.prior[[j]]$model, P[j,], Ak, lambda, d[j+1])
+                g.prev <- P.a.gamma(g.prev, geno, Pm.prior[[j]], P[j,], Ak, lambda, d[j+1])
                 gammas[,j,,] <- gammas[,j,,] * g.prev
             }else{
                 if(jj == length(ord))
@@ -259,21 +259,21 @@ P.a.gamma <- function(prev, geno, prior, P, Ak, lambda, d)
 
     pg <- pr * Ak + (1 - pr) * prev
 
-    if(length(prior[[1]]$linked) > 0) # this shouldn't be possible, but somehow it is...???
+    if(length(prior$linked) > 0) # this shouldn't be possible, but somehow it is...???
     {
         pa <- pg # same format
 
         #### P(a) ####
         for(c in 1:2)
         {
-            if(is.matrix(prior[[1]]$eig) | length(prior[[1]]$eig) > 1)
+            if(is.matrix(prior$eig) | length(prior$eig) > 1)
             {
-                pcs <- geno[,prior[[1]]$linked,c] %*% prior[[1]]$eig
+                pcs <- geno[,prior$linked,c] %*% prior$eig
             }else{
-                pcs <- geno[,prior[[1]]$linked,c]
+                pcs <- geno[,prior$linked,c]
             }
 
-            lr <- cbind(1, pcs) %*% prior[[1]]$betas
+            lr <- cbind(1, pcs) %*% prior$betas
 
             rat <- exp(lr)
             pa[,c,1] <- ifelse(rat == Inf, 1, exp(lr) / (1 + exp(lr)))
@@ -356,15 +356,15 @@ P.gammas.a <- function(locus, geno, prior, P, A0, Ak, lambda, d, gammas.prev)
                                           (1 + (k1 == k2)) # divide by 2 when k1 == k2
 
         # probability of observing varant allele given ancestral state is k
-        pO <- P.O2(geno[,prior$model[[k]]$linked, drop = FALSE], P = P[c(k1, k2)],
-                   prior = prior$model[[k]], linked = length(prior$model[[k]]$linked) > 0)
+        pO <- P.O2(geno[,prior$linked, drop = FALSE], P = P[c(k1, k2)],
+                   prior = prior, linked = length(prior$linked) > 0)
 
         # " but with recombination it is no longer linked to previous markers
-        pO2 <- P.O2(geno[,prior$model[[k]]$linked, drop = FALSE], P = P[c(k1, k2)],
-                    prior = prior$model[[k]], linked = FALSE)
+        pO2 <- P.O2(geno[,prior$linked, drop = FALSE], P = P[c(k1, k2)],
+                    prior = prior, linked = FALSE)
 
         # probability of a crossover within the block supporting pO
-        p.b.recomb <- 1 - apply(exp(-lambda*prior$model[[k]]$d / 100), 1, prod)
+        p.b.recomb <- 1 - apply(exp(-lambda*prior$d / 100), 1, prod)
 
         # probability of observed allele given ancestral state is k
         tmp <- cbind(locus == 0, locus == 1, locus == 2)
@@ -630,7 +630,7 @@ P.O <- function(O.prev, P, prior, linked)
     if(length(dims) == 2)
         dims <- c(dims[1], 1, dims[2]) # if only one marker (or none), it will be mising it's second dimension
 
-    .Call("P_O", as.numeric(O.prev), as.numeric(P), as.numeric(prior$betas),
+    .Call("P_O", as.numeric(O.prev), as.numeric(P), as.numeric(prior$betas), ###this may fail if betas is a matrix
           as.numeric(prior$eig), as.integer(linked & !is.null(prior$eig)),
           as.integer(dims))
 }

@@ -16,7 +16,7 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
 ######### haplo/geno-type formatting #########
 
-    if(!is.null(haps) & is.null(geno))
+    if(!is.null(haps))
     {
         tmp <- array(0, dim = c(dim(haps)[1] / 2, dim(haps)[2], 2),
                      dimnames = list(dimnames(haps)[[1]][1:(dim(haps)[1]/2) * 2 - 1],
@@ -26,7 +26,10 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
         tmp[,,2] <- haps[1:dim(tmp)[1] * 2,]
         haps <- tmp
 
-        geno <- apply(haps, 1:2, sum)
+        if(is.null(geno))
+        {
+            geno <- apply(haps, 1:2, sum)
+        }
     }
 
     # check that dimnames, and IDs are consistent
