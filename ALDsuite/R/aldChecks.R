@@ -189,14 +189,37 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
 
     # pos/d format check
     if(length(names(Pm.prior)) != length(pos))
-        stop("Length of pos (", length(pos),  ") should be match length of Pm.prior (", length(names(Pm.prior)), ').')
+        stop("Length of pos (", length(pos),  ") should be match length of Pm.prior (",
+             length(names(Pm.prior)), ').')
 
     if(any(names(Pm.prior) != marker.id))
         stop("Each marker in Pm.prior needs to be present in marker.id when not null.")
 
-    ## if(any(unlist(lapply(Pm.prior, length)) != 3) | # each marker should have 3 elements
-    ##    length(table(unlist(lapply(Pm.prior, lapply, length)))) != 1) # each element should have length K
-    ##     stop("Formatting error in Pm.prior detected.")
+    if(any(sapply(Pm.prior, function(x) !all(names(x) == c('freq', 'n', 'linked', 'd', 'eig', 'betas', 'vcv',
+                                                           'hessian')))))
+        stop("Some names of the elements of Pm.prior are incorrect.")
+
+    if(any(sapply(Pm.prior, function(x) length(x$freq) != length(x$n))))
+        stop("Some lengths of freq and n within Pm.prior are not equal.")
+
+    # make sure eig is a matrix and then add these checks back in
+    ## if(any(sapply(Pm.prior, function(x) length(x$linked) != dim(x$eig)[1])))
+    ##     stop("Some dimensions of link and eig within Pm.prior are not compatible.")
+
+    ## if(any(sapply(Pm.prior, function(x) dim(x$eig)[2] != dim(x$betas)[1] - 1)))
+    ##     stop("Some dimensions of eig and betas within Pm.prior are not compatible.")
+
+    if(any(sapply(Pm.prior, function(x) dim(x$betas)[2] != length(x$freq) - 1)))
+        stop("Some dimensions of freq and betas within Pm.prior are not compatible.")
+
+    if(any(sapply(Pm.prior, function(x) dim(x$betas)[1] != dim(x$vcv)[1] |
+                                        dim(x$betas)[1] != dim(x$vcv)[2] |
+                                        dim(x$betas)[1] != dim(x$hessian)[1] |
+                                        dim(x$betas)[1] != dim(x$hessian)[2])))
+        stop("Some dimensions of betas, vcv and hessian within Pm.prior are not compatible.")
+
+    if(any(sapply(Pm.prior, function(x) prod(round(diag(x$vcv %*% x$hessian), 2)) != 1)))
+        stop("Some hessians appear not to be the (quasi)-inverse of vcv within Pm.prior")
 
 
 ########## be sure gender is specified if anything in chr == sex.chr ##########
