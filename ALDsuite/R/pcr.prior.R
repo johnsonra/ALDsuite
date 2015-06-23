@@ -106,11 +106,11 @@ setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6,
 
             ### PC Regression ###
             retval[[rs]] <- pcr.prior(tmp)
+
+            ### Drop training data ###
+            retval[[rs]]$train <- NULL
         }
     }
-
-    # we don't need this anymore
-    retval$train <- NULL
 
     if(unphased)
     {
@@ -183,40 +183,40 @@ pca.setup <- function(train, rs.cur, map, thresh, maxpcs, window, n.samp, unphas
         model$n[pops[k]] <- sum(train$dat[,1] == k)
     }
 
+    if(unphased)
+    {
+        # combine chromosomes to simulate new people (these will have no crossovers --
+        #   i.e. one chromosome from each ancestral population -- or two from one population)
+        genos <- matrix(nrow = 0, ncol = dim(model$train)[2],
+                        dimnames = list(character(), colnames(model$train)))
+
+        for(k1 in 1:length(pops))
+        {
+            for(k2 in k1:length(pops))
+            {
+                pick1 <- sample((1:dim(model$train)[1])[model$train[,1] == k1],
+                                size = n.samp, replace = TRUE)
+                pick2 <- sample((1:dim(model$train)[1])[model$train[,1] == k2],
+                                size = n.samp, replace = TRUE)
+
+                # calculate genotypes
+                pick <- cbind(as.numeric(paste(k1, k2, sep = '.')),
+                              train$dat[pick1,linked] + train$dat[pick2,linked])
+
+                # add newly simulated individuals to the unphased data set
+                genos <- rbind(genos, pick)
+            }
+        }
+
+        # replace phased data with unphased data
+        model$train <- genos
+    }
+
     # if only one marker, no need to calculate eigenvectors
     if(length(linked) == 1)
     {
         model$eig <- 1
     }else{
-        if(unphased)
-        {
-            # combine chromosomes to simulate new people (these will have no crossovers --
-            #   i.e. one chromosome from each ancestral population -- or two from one population)
-            genos <- matrix(nrow = 0, ncol = dim(model$train)[2],
-                            dimnames = list(character(), colnames(model$train)))
-
-            for(k1 in 1:length(pops))
-            {
-                for(k2 in k1:length(pops))
-                {
-                    pick1 <- sample((1:dim(model$train)[1])[model$train[,1] == k1],
-                                    size = n.samp, replace = TRUE)
-                    pick2 <- sample((1:dim(model$train)[1])[model$train[,1] == k2],
-                                    size = n.samp, replace = TRUE)
-
-                    # calculate genotypes
-                    pick <- cbind(as.numeric(paste(k1, k2, sep = '')),
-                                  train$dat[pick1,linked] + train$dat[pick2,linked])
-
-                    # add newly simulated individuals to the unphased data set
-                    genos <- rbind(genos, pick)
-                }
-            }
-
-            # replace phased data with unphased data
-            model$train <- genos
-        }
-
         # PCA for all linked markers
         cormat <- cor(model$train[,-1], use = 'pairwise.complete.obs')
         cormat[!is.finite(cormat)] <- 0
@@ -243,6 +243,7 @@ pcr.prior <- function(retval)
 {
     # responses
     groups <- unique(retval$train[,1])
+    pops <- names(retval$freq)
 
     # regression
     if(dim(retval$train)[2] == 2)
@@ -259,14 +260,18 @@ pcr.prior <- function(retval)
         lreg <- logitreg(y, X %*% retval$eig)
 
         retval$betas <- t(t(lreg$par)) # collect and name betas
-        colnames(retval$betas) <- names(retval$freq)[1]
+        colnames(retval$betas) <- pops[1]
     }else{
         y <- sapply(groups, function(i) retval$train[,1] == i)
 
         lreg <- multilogitreg(y, X %*% retval$eig)
 
         retval$betas <- lreg$par # collect and name betas
-        colnames(retval$betas) <- groups[1:(length(groups) - 1)]
+
+        groups <- strsplit(as.character(groups), '.', fixed = TRUE)
+        groups[[length(groups)]] <- NULL
+        colnames(retval$betas) <- paste(pops[as.numeric(sapply(groups, `[`, 1))],
+                                        pops[as.numeric(sapply(groups, `[`, 2))], sep = '.')
     }
 
     # collect variance/covariance and hessian matrices
@@ -400,7 +405,7 @@ multilogitreg <- function(y, X, start = NULL, hessian = TRUE)
                  hessian = hessian)
 
     fit$par <- matrix(fit$par, ncol(X), ncol(y) - 1,
-                      dimnames = list(paste('b', 1:ncol(X) - 1, sep = ''), c('p1', 'p2')))
+                      dimnames = list(c('(Intercept)', paste('PC', 1:(ncol(X) - 1), sep = '')), NULL))
 
     if(hessian)
         fit$vcv <- solve.approx(fit$hessian) # variance covariance matrix
