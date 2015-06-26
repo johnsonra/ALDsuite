@@ -214,22 +214,18 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
     for(j in 1:length(Pm.prior))
     {
-        for(k in 1:length(Pm.prior[[j]]$model))
+        if(length(Pm.prior[[j]]$betas) > 0)
         {
-            # we use the upstream markers to infer genotypes in forward chain
-            if(length(Pm.prior[[j]]$model[[k]]$betas) > 0)
-            {
-                Pm.prior[[j]]$model[[k]]$betas.p <- Pm.prior[[j]]$model[[k]]$betas
-                Pm.prior[[j]]$model[[k]]$betas.prior <- Pm.prior[[j]]$model[[k]]$betas
+            Pm.prior[[j]]$betas.p <- Pm.prior[[j]]$betas
+            Pm.prior[[j]]$betas.prior <- Pm.prior[[j]]$betas
 
-                Pm.prior[[j]]$model[[k]]$sigma <- diag(Pm.prior[[j]]$model[[k]]$vcv)
+            Pm.prior[[j]]$sigma <- diag(Pm.prior[[j]]$vcv)
 
-                if(any(is.na(Pm.prior[[j]]$model[[k]]$sigma)))
-                    stop("NaNs detected in Pm.prior[[...]]model[[...]]$vcv")
+            if(any(is.na(Pm.prior[[j]]$sigma)))
+                stop(paste("NaNs detected in Pm.prior[[", j, "]]$vcv", sep = ''))
 
-                if(length(Pm.prior[[j]]$model[[k]]$betas) > maxbetas)
-                    maxbetas <- length(Pm.prior[[j]]$model[[k]]$betas)
-            }
+            if(length(Pm.prior[[j]]$betas) > maxbetas)
+                maxbetas <- length(Pm.prior[[j]]$betas)
         }
     }
 
@@ -315,7 +311,7 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                                ncvar_def("tau", "hyper", list(dimHyper2, dimIter), -1),
                                ncvar_def("sigmaA", "hyper", list(dimPops, dimIter), -1),
                                ncvar_def("sigmaL", "hyper", list(dimIter), -1),
-                               ncvar_def("PCRbetas", "hyper", list(dimBetas, dimMarkers, dimPops, dimIter), -1))
+                               ncvar_def("PCRbetas", "hyper", list(dimBetas, dimMarkers, dimIter), -1))
 
             # create and open file
             nc.debug <- nc_create("mald.debug.nc", debug.vars)
@@ -422,13 +418,10 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
                     for(j in 1:length(Pm.prior))
                     {
-                        for(l in 1:length(Pm.prior[[j]]$model))
-                        {
-                            if(!is.null(Pm.prior[[j]]$model[[l]]$betas.p))
-                                ncvar_put(nc.debug, "PCRbetas", Pm.prior[[j]]$model[[l]]$betas.p,
-                                          start = c(1, j, l, supercyc),
-                                          count = c(length(Pm.prior[[j]]$model[[l]]$betas.p), 1, 1, 1))
-                        }
+                        if(!is.null(Pm.prior[[j]]$model[[l]]$betas.p))
+                            ncvar_put(nc.debug, "PCRbetas", Pm.prior[[j]]$betas.p,
+                                      start = c(1, j, supercyc),
+                                      count = c(length(Pm.prior[[j]]$betas.p), 1, 1))
                     }
 
                     nc.debug <- nc_close(nc.debug)
@@ -479,17 +472,11 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
                     for(j in 1:length(Pm.prior))
                     {
-                        for(k in 1:length(Pm.prior[[j]]$model))
+                        if(length(Pm.prior[[j]]$linked) > 0)
                         {
-                            if(length(Pm.prior[[j]]$model[[k]]$linked) > 0)
-                            {
-                                Pm.prior.r[[j]]$model[[k]]$betas <- Pm.prior.r[[j]]$model[[k]]$betas +
-                                                                    Pm.prior.all[[s]][[j]]$model[[k]]$betas
-                                Pm.prior.r[[j]]$model[[k]]$vcv <- Pm.prior.r[[j]]$model[[k]]$vcv +
-                                                                  Pm.prior.all[[s]][[j]]$model[[k]]$vcv
-                                Pm.prior.r[[j]]$model[[k]]$hessian <- Pm.prior.r[[j]]$model[[k]]$hessian +
-                                                                      Pm.prior.all[[s]][[j]]$model[[k]]$hessian
-                            }
+                            Pm.prior.r[[j]]$betas <- Pm.prior.r[[j]]$betas + Pm.prior.all[[s]][[j]]$betas
+                            Pm.prior.r[[j]]$vcv <- Pm.prior.r[[j]]$vcv + Pm.prior.all[[s]][[j]]$vcv
+                            Pm.prior.r[[j]]$hessian <- Pm.prior.r[[j]]$hessian + Pm.prior.all[[s]][[j]]$hessian
                         }
                     }
                 }
@@ -507,14 +494,11 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
                 for(j in 1:length(Pm.prior))
                 {
-                    for(k in 1:length(Pm.prior[[j]]$model))
+                    if(length(Pm.prior[[j]]$linked) > 0)
                     {
-                        if(length(Pm.prior[[j]]$model[[k]]$linked) > 0)
-                        {
-                            Pm.prior.r[[j]]$model[[k]]$betas <- Pm.prior.r[[j]]$model[[k]]$betas / cores
-                            Pm.prior.r[[j]]$model[[k]]$vcv <- Pm.prior.r[[j]]$model[[k]]$vcv / cores
-                            Pm.prior.r[[j]]$model[[k]]$hessian <- Pm.prior.r[[j]]$model[[k]]$hessian / cores
-                        }
+                        Pm.prior.r[[j]]$betas <- Pm.prior.r[[j]]$betas / cores
+                        Pm.prior.r[[j]]$vcv <- Pm.prior.r[[j]]$vcv / cores
+                        Pm.prior.r[[j]]$hessian <- Pm.prior.r[[j]]$hessian / cores
                     }
                 }
 
@@ -547,17 +531,14 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
                                  for(j in 1:length(Pm.prior))
                                  {
-                                     for(k in 1:length(Pm.prior[[j]]$model))
+                                     if(length(Pm.prior[[j]]$linked) > 0)
                                      {
-                                         if(length(Pm.prior[[j]]$model[[k]]$linked) > 0)
-                                         {
-                                             Pm.prior[[j]]$model[[k]]$betas <- mixing*Pm.prior[[j]]$model[[k]]$betas +
-                                                                       (1 - mixing)*Pm.prior.r[[j]]$model[[k]]$betas
-                                             Pm.prior[[j]]$model[[k]]$vcv <- mixing*Pm.prior[[j]]$model[[k]]$vcv +
-                                                                     (1 - mixing)*Pm.prior.r[[j]]$model[[k]]$vcv
-                                             Pm.prior[[j]]$model[[k]]$hessian <- mixing*Pm.prior[[j]]$model[[k]]$hessian +
-                                                                         (1 - mixing)*Pm.prior.r[[j]]$model[[k]]$hessian
-                                         }
+                                         Pm.prior[[j]]$betas <- mixing*Pm.prior[[j]]$betas +
+                                                                (1 - mixing)*Pm.prior.r[[j]]$betas
+                                         Pm.prior[[j]]$vcv <- mixing*Pm.prior[[j]]$$vcv +
+                                                              (1 - mixing)*Pm.prior.r[[j]]$vcv
+                                         Pm.prior[[j]]$hessian <- mixing*Pm.prior[[j]]$hessian +
+                                                                  (1 - mixing)*Pm.prior.r[[j]]$hessian
                                      }
                                  }
                              }))
@@ -644,13 +625,10 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
                     for(j in 1:length(Pm.prior))
                     {
-                        for(l in 1:length(Pm.prior[[j]]$model))
-                        {
-                            if(!is.null(Pm.prior[[j]]$model[[l]]$betas.p))
-                                ncvar_put(nc.debug, "PCRbetas", Pm.prior[[j]]$model[[l]]$betas.p,
-                                          start = c(1, j, l, supercyc),
-                                          count = c(length(Pm.prior[[j]]$model[[l]]$betas.p), 1, 1, 1))
-                        }
+                        if(!is.null(Pm.prior[[j]]$betas.p))
+                            ncvar_put(nc.debug, "PCRbetas", Pm.prior[[j]]$betas.p,
+                                      start = c(1, j, supercyc),
+                                      count = c(length(Pm.prior[[j]]$betas.p), 1, 1))
                     }
 
                     nc.debug <- nc_close(nc.debug)
