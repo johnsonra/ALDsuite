@@ -51,59 +51,14 @@ P.recombination <- function(x, lambda, distance)
     .Call("P_recombination", as.integer(x), as.numeric(lambda), as.numeric(distance) / 100)
 }
 
-####################################################
-# P(gamma == x ; lambda, distance, Ak, gamma.prev) #
-####################################################
-
-# x in {1,2,...} (ancestral allele population code)
-P.gamma <- function(x, lambda, distance, Ak, gamma.prev = rep(NA, dim(Ak)[2]), p.recomb.T, p.recomb.F)
-{
-  if(is.null(dim(gamma.prev)))
-      gamma.prev <- t(gamma.prev)
-
-  if(is.null(dim(Ak)))
-      Ak <- t(Ak)
-
-  # for the first locus in the chain this is simply a function of global ancestry
-  if(length(gamma.prev) > 1) # I don't think this is correct...should rely on dimensions, no?
-      return(ifelse(is.na(gamma.prev[,x]), Ak[,x],
-                    p.recomb.F * gamma.prev[,x] +  # function of recombination
-                    p.recomb.T * Ak[,x]))
-
-  return(ifelse(is.na(gamma.prev[x]), Ak[x],
-                    p.recomb.F * gamma.prev[x] +  # function of recombination
-                    p.recomb.T * Ak[x]))
-}
-
-####################################
-# P(a == x | gamma, gamma.alt ; P) #
-####################################
-
-# x in {0,1,2} (0, 1 or 2 variant alleles)
-P.a.gamma.gamma <- function(x, gamma, gamma.alt, P)
-{
-    if(is.null(dim(P))) # when a vector of length equal to the number of populations
-    {                   # don't forget 0-based indexing ___________________________________________
-                        #                                                \                         \
-                        #                                                 V                         V
-       tmp <- .Call("P_a_gamma_gamma1", as.integer(0:2), as.integer(gamma - 1), as.integer(gamma.alt - 1),
-                    as.numeric(P))
-
-       return(ifelse(is.na(x), 1, tmp[x + 1]))
-   }
-
-    # when an array with dim1 - individual, dim2 - chromosome (mother/father), dim3 - population
-    .Call("P_a_gamma_gamma2", as.integer(x), as.integer(gamma - 1), as.integer(gamma.alt - 1),
-          as.numeric(P), as.integer(dim(P)))
-}
 
 ###############################################################################################
 # P(gamma == x | a ; P, lambda, lambda.alt, distance, Ak, Ak.alt, gamma.prev, gamma.alt.prev) #
 ###############################################################################################
 
-P.gammas <- function(geno, P, Pm.prior, lambda, lambdaX, d, chr, A0, Ak, AX, gender, sex.chr, haps, dev)
+P.gammas <- function(geno, P, Pm.prior, lambda, lambdaX, d, chr, A0, Ak, AX, gender, sex.chr, unphased, dev)
 {
-    if(haps)
+    if(!unphased)
     {
         combos <- dimnames(P)[[2]]
 
@@ -125,18 +80,6 @@ P.gammas <- function(geno, P, Pm.prior, lambda, lambdaX, d, chr, A0, Ak, AX, gen
 
     for(chr.curr in unique(chr))
     {
-        ## if(haps)
-        ## {
-        ##     # probability of g given previous state
-        ##     pag <- array(0, c(dim(geno)[1], sum(chr == chr.curr), 2, dim(P)[2]),
-        ##                  dimnames = list(dimnames(geno)[[1]], names(Pm.prior)[chr == chr.curr],
-        ##                                  c('Mother', 'Father'), dimnames(P)[[2]]))
-
-        ##     # use these for calculations below (saves time)
-        ##     pr <- pag[,,,1]
-        ##     pgNeqg <- pag
-        ## }
-
         # use for sex chromosome calculations
         if(chr.curr == sex.chr)
         {
@@ -153,19 +96,9 @@ P.gammas <- function(geno, P, Pm.prior, lambda, lambdaX, d, chr, A0, Ak, AX, gen
         # Forward chain #
         for(j in ord)
         {
-            # this is the chromosome specific index (j is relative to the entire genome)
-            jj <- j - min(ord) + 1
-
             ### P(gammas | a) ###
-            if(haps)
-            {
-                gammas[,j,,] <- P.a.gamma(gammas[,max(j-1, 1),,], geno, Pm.prior[[j]],
-                                          P[j,], Ak, lambda, d[j])
-            }else{
-                # -- gammas.prev is ignored on the first time through --
-                gammas[,j,1,] <- P.gammas.a(geno[,j], geno, Pm.prior[[j]], P[j,], A0, Ak,
-                                            lambda, d[j], gammas[,max(j - 1, 1),1,])
-            }
+            gammas[,j,,] <- P.gamma.a(gammas[,max(j-1, 1),,], geno, Pm.prior[[j]],
+                                      P[j,], Ak, lambda, d[j], unphased)
         }
 
         g.prev <- gammas[,1,,] # ignored, but this is the correct format...
@@ -173,22 +106,8 @@ P.gammas <- function(geno, P, Pm.prior, lambda, lambdaX, d, chr, A0, Ak, AX, gen
         # Reverse Chain #
         for(j in ord[length(ord):1])
         {
-            # this is the chromosome specific index (j is relative to the entire genome)
-            jj <- j - min(ord) + 1
-
-            if(haps)
-            {
-                g.prev <- P.a.gamma(g.prev, geno, Pm.prior[[j]], P[j,], Ak, lambda, d[j+1])
-                gammas[,j,,] <- gammas[,j,,] * g.prev
-            }else{
-                if(jj == length(ord))
-                {
-                    g.prev <- gammas[,1,1,, drop = FALSE]
-                }
-
-                g.prev[,1,1,] <- P.gammas.a(geno[,j], geno, Pm.prior[[j]], P[j,], A0, Ak,
-                                          lambda, d[j+1], g.prev[,1,1,])
-            }
+            g.prev <- P.a.gamma(g.prev, geno, Pm.prior[[j]], P[j,], Ak, lambda, d[j+1], unphased)
+            gammas[,j,,] <- gammas[,j,,] * g.prev
         }
 
         # normalize the two
@@ -243,11 +162,8 @@ P.gamma.aX <- function(x, a, P, lambda, d, Ak, gamma.prev)
     return(pag * pg)# / pa)
 }
 
-P.a.gamma <- function(prev, geno, prior, P, Ak, lambda, d)
+P.gamma.a <- function(prev, geno, prior, P, Ak, lambda, d, unphased)
 {
-    pag <- array(NA, dim = c(dim(geno)[1], 2, length(P)),
-                 dimnames = list(dimnames(geno)[[1]], c('Mother', 'Father'), names(P)))
-
     ### P(recombination with previous marker in MCMC chain) ###
     if(!is.na(d))
     {
@@ -257,226 +173,86 @@ P.a.gamma <- function(prev, geno, prior, P, Ak, lambda, d)
         pr <- 1
     }
 
-    pg <- pr * Ak + (1 - pr) * prev
+    if(unphased)
+    {
+        # r = 0
+        pg <- (1 - pr)^2 * prev
+
+        for(k1 in 1:dim(Ak)[3])
+        {
+            for(k2 in k1:dim(Ak)[3])
+            {
+                index <- paste('g', k1, k2, sep = '')
+
+                # r = 1
+                p1 <- prev[,substr(dimnames(prev)[[2]], 2,2) == k1, drop = FALSE]
+                p2 <- prev[,substr(dimnames(prev)[[2]], 3,3) == k2, drop = FALSE]
+
+                if(dim(p1)[2] > 0)
+                    pg[,index] <- pg[,index] + 2*pr*(1 - pr) * apply(p1 * Ak[,1,k1] / 2, 1, sum)
+
+                if(dim(p2)[2] > 0)
+                    pg[,index] <- pg[,index] + 2*pr*(1 - pr) * apply(p2 * Ak[,1,k2] / 2, 1, sum)
+
+                # r = 2
+                pg[,index] <- pg[,index] + pr^2 * Ak[,1,k1] * Ak[,1,k2] * ifelse(k1 == k2, 1, 2) # r = 2
+            }
+        }
+    }else{
+        pg <- pr * Ak + (1 - pr) * prev
+    }
 
     if(length(prior$linked) > 0) # this shouldn't be possible, but somehow it is...???
     {
-        pa <- pg # same format
+        pag <- pg # same format
 
         #### P(a) ####
-        for(c in 1:2)
+        index <- array(FALSE, dim = dim(geno), dimnames = dimnames(geno))
+        if(unphased)
         {
-            if(is.matrix(prior$eig) | length(prior$eig) > 1)
-            {
-                pcs <- geno[,prior$linked,c] %*% prior$eig
-            }else{
-                pcs <- geno[,prior$linked,c]
-            }
-
-            lr <- cbind(1, pcs) %*% prior$betas
-
-            rat <- exp(lr)
-            pa[,c,1] <- ifelse(rat == Inf, 1, exp(lr) / (1 + exp(lr)))
+            index[,prior$linked] <- TRUE
+        }else{
+            index[,prior$linked,] <- TRUE
         }
 
-        pa[,,2] <- 1 - pa[,,1]
+        # calculate PCR predictors based on PC loadings
+        if(is.matrix(prior$eig) | length(prior$eig) > 1)
+        {
+            pcs <- geno[index] %*% prior$eig
+        }else{
+            pcs <- geno[index]
+        }
 
-        pga <- pa * pg
+        # log likelihood ratio
+        lr <- cbind(1, pcs) %*% prior$betas
 
-        for(c in 1:2)
-            pga[,c,] <- pga[,c,] / apply(pga[,c,], 1, sum)
+        # ratio
+        rat <- exp(lr)
+
+        # probability of a given g
+        index <- array(TRUE, dim = dim(pag), dimnames = dimnames(pag))
+        if(unphased)
+        {
+            index[,dim(index)[2]] <- FALSE
+        }else{
+            index[,,dim(index)[3]] <- FALSE
+        }
+
+        denom <- apply(lr, 1, sum)
+        pag[index] <- ifelse(rat == Inf, 1, exp(lr) / (1 + exp(denom)))
+        pag[!index] <- 0
+
+        pag[!index] <- 1 - apply(pag, 1:(length(dim(pag)) - 1), sum)
+
+        pga <- pag * pg
+
+        # divide by sum over the last dimension
+        pga <- pga / apply(pga, 1:(length(dim(pga)) - 1), sum)
 
         return(pga)
     }else{
         return(pg)
     }
-}
-
-P.gammas.a <- function(locus, geno, prior, P, A0, Ak, lambda, d, gammas.prev)
-{
-    combos <- numeric()
-    for(k1 in 1:length(P))
-    {
-        for(k2 in k1:length(P))
-        {
-            combos <- c(combos, paste('g', k1, k2, sep = ''))
-        }
-    }
-
-    pga <- array(0, dim = c(dim(geno)[1], length(combos)),
-                 dimnames = list(dimnames(geno)[[1]], combos))
-
-    ### P(recombination with previous marker in MCMC chain) ###
-    if(!is.na(d))
-    {
-        pr <- cbind(P.recombination(TRUE, lambda[,1], d),
-                    P.recombination(TRUE, lambda[,2], d))
-
-        # probability of one recombination
-        tmp <- pr[,1] * (1 - pr[,2]) + (1 - pr[,1]) * pr[,2]
-
-        # probability of two recombinations
-        pr[,2] <- apply(pr, 1, prod)
-
-        pr[,1] <- tmp
-    }else{
-        pr <- cbind(rep(0, dim(lambda)[1]), rep(1, dim(lambda)[1]))
-    }
-
-    ### P(O | known ancestral state) ###
-    for(k in 1:length(combos))
-    {
-        # we will want these later
-        k1 <- as.numeric(substr(combos[k], 2, 2))
-        k2 <- as.numeric(substr(combos[k], 3, 3))
-
-        # add probability of no recombinations on either chromosome
-        pga[,k] <- (1 - apply(pr, 1, sum)) * gammas.prev[,k]
-
-        # add probability of one recombination on one chromosome
-        for(kprev in combos)
-        {
-            case <- c(combos[k] == kprev, # same
-                      sum(strsplit(combos[k], '')[[1]] %in% strsplit(kprev, '')[[1]]) == 1) # couble recomb
-
-            pga[,k] <- pga[,k] +
-                switch(c('same', 'double', 'one')[c(case[1], case[2], all(!case))],
-                       same = pr[,1] * ((A0[,k1] + A0[,k2]) / 2) * gammas.prev[,kprev],
-                       double = 0,
-                       one =
-                       { # otherwise it was a specific one...which one did it change to?
-                           changed <- c(k1, k2)[which(!c(k1, k2) %in% strsplit(kprev, '')[[1]] |
-                                                      !strsplit(kprev, '')[[1]][-1] %in% c(k1, k2))]
-                           pr[,1] * A0[,changed]  * gammas.prev[,kprev]
-                       })
-        }
-
-        # add probability of double recombination to k
-        pga[,k] <- pga[,k] + pr[,2] * (Ak[,1,k1]*Ak[,2,k2] + Ak[,1,k2]*Ak[,2,k1]) /
-                                          (1 + (k1 == k2)) # divide by 2 when k1 == k2
-
-        # probability of observing varant allele given ancestral state is k
-        pO <- P.O2(geno[,prior$linked, drop = FALSE], P = P[c(k1, k2)],
-                   prior = prior, linked = length(prior$linked) > 0)
-
-        # " but with recombination it is no longer linked to previous markers
-        pO2 <- P.O2(geno[,prior$linked, drop = FALSE], P = P[c(k1, k2)],
-                    prior = prior, linked = FALSE)
-
-        # probability of a crossover within the block supporting pO
-        p.b.recomb <- 1 - apply(exp(-lambda*prior$d / 100), 1, prod)
-
-        # probability of observed allele given ancestral state is k
-        tmp <- cbind(locus == 0, locus == 1, locus == 2)
-
-        pag <- ifelse(is.na(locus), 1, pO[tmp] * (1 - p.b.recomb) +
-                                       pO2[tmp] * p.b.recomb)
-        pga[,k] <- pga[,k] * pag
-    }
-
-    # normalize
-    pga <- pga / apply(pga, 1, sum)
-
-    return(pga)
-}
-
-
-###########################################
-# P(n.crossovers == 0 ; lambda, distance) #
-###########################################
-
-P.0crossovers <- function(lambda, distance)
-{
-   exp(-lambda*distance / 100)
-}
-
-qodd.crossovers <- function(p.crossovers, lambda, distances)
-{
-    # we'll use these below
-    p.recomb.T <- P.recombination(TRUE, lambda, distances)
-    ld <- lambda*distances
-    lld <- log(lambda*distances)
-
-    retval <- rep(0, length(p.crossovers))
-
-    for(j in 1:length(p.crossovers))
-    {
-        if(p.crossovers[j] >= 1)
-        {
-            retval[j] <- NA
-            next
-        }
-        if(distances[j] == 0)
-        {
-            retval[j] <- 0
-            next
-        }
-
-        p <- ld[j] * exp(-ld[j]) / p.recomb.T[j]
-
-        n <- 3 # for next step -- always 1 step ahead here for the while loop
-        tmp <- exp(n*lld[j] - ld[j] - lgamma(n)) / p.recomb.T[j]
-
-        while(p + tmp <= p.crossovers[j])
-        {
-            p <- p + tmp
-
-            n <- n + 2
-            tmp <- exp(n*lld[j] - ld[j] - lgamma(n)) / p.recomb.T[j]
-        }
-
-        retval[j] <- n - 2 # we'll always go one step too far
-    }
-
-    return(retval)
-}
-
-##################################################################
-# P(n.crossovers > 0 | gamma_j, gamma_j-1 ; Ak, lambda, distance #
-##################################################################
-
-# G = sampled ancestry states
-# A = parent's global ancestry
-# lambda = parent's lambda value
-# distance = d -- should have 0's instead of NAs for 1st marker in each chromosome
-# m = dim(G)[1] == length(distance)
-P.1plus.crossover.G <- function(G, A, lambda, distance, m)
-{
-    # get population numbers for G
-    g <- G %*% 1:dim(G)[2]
-
-    # [P]robability of [0] and [P]robability of [1] [P]lus crossovers
-    p0 <- exp(-lambda * distance[-1])
-    p1p <- 1 - p0
-
-    retval <- ifelse(g[-1] != g[-m], 1,
-                     A[g[-1]] * p1p / (p0 + A[g[-1]] * p1p))
-
-    return(retval)
-}
-
-P.1plus.crossover.gamma.gamma.prev <- function(gamma, gamma.prev, A, lambda, distance)
-{
-    # [P]robability of [0] and [P]robability of [1] [P]lus crossovers
-    p0 <- P.0crossovers(lambda, distance)
-
-    retval <- rep(0, dim(gamma)[1])
-
-    for(g1 in 1:length(A))
-        for(g2 in 1:length(A))
-        {
-            if(g1 != g2)
-            {
-                retval <- retval + gamma[,g1] * gamma.prev[,g2]
-            }else{
-                tmp <- exp(-2*lambda*distance)
-                odd <- A[g1] * (1 - tmp) / 2
-                even <- (1 + tmp) / 2 - p0
-                retval <- retval + ( (odd + even) / (p0 + odd + even) ) * ( gamma[,g1] * gamma.prev[,g2] )
-            }
-        }
-
-    return(retval)
 }
 
 
@@ -611,62 +387,6 @@ rdirichlet <- function(n, alpha)
     return(tmp / rowSums(tmp))
 }
 
-
-##########################################################################
-# probability of allele state (variant) given gamma and previous markers #
-##########################################################################
-
-# This isn't for use in trying to assign alleles, but rather for identifying the
-# likelihood of observing a variant allele under no recombination.
-
-# This is current-marker-genotype-agnostic, but does rely on previous markers.
-
-# If the marker is unlinked to previous markers, this simplifies to the values in P,
-# otherwise it relies on linkage in the prior sample
-
-P.O <- function(O.prev, P, prior, linked)
-{
-    dims <- dim(O.prev)
-    if(length(dims) == 2)
-        dims <- c(dims[1], 1, dims[2]) # if only one marker (or none), it will be mising it's second dimension
-
-    .Call("P_O", as.numeric(O.prev), as.numeric(P), as.numeric(prior$betas), ###this may fail if betas is a matrix
-          as.numeric(prior$eig), as.integer(linked & !is.null(prior$eig)),
-          as.integer(dims))
-}
-
-P.O2 <- function(O.prev, P, prior, linked)
-{
-    pO <- matrix(NA, dim(O.prev)[1], 3, dimnames = list(dimnames(O.prev)[[1]], c('a=0', 'a=1', 'a=2')))
-
-    # do this by individual... transfer to C
-    if(linked & !is.null(prior$eig)) # sometimes we get uninformative markres nearby -> in pcr.prior
-    {
-        tmp <- cbind(O.prev[,] == 1, O.prev[,] == 2)
-
-        pcs <- tmp %*% prior$eig
-        lratios <- cbind(1, pcs) %*% prior$betas
-        ratios <- exp(lratios)
-
-        pO[,1] <- 1 / (1 + apply(ratios, 1, sum))
-        pO[,2:3] <- ratios * pO[,1]
-
-        if(!all(is.finite(pO)))
-        {
-            bad <- pO[,1] == 0
-            pO[bad,'a=1'] <- 1 / (1 + exp(lratios[bad,1] - lratios[bad,2]))
-            pO[bad,'a=2'] <- 1 / (1 + exp(lratios[bad,2] - lratios[bad,1]))
-        }
-
-        pO <- ifelse(pO == Inf, 1, pO)
-    }else{
-        pO[,'a=0'] <- (1 - P[1]) * (1 - P[2])
-        pO[,'a=1'] <- P[1] * (1 - P[2]) + (1 - P[1]) * P[2]
-        pO[,'a=2'] <- P[1] * P[2]
-    }
-
-    return(pO)
-}
 
 ################################
 # Inverse Wishart distribution #
