@@ -19,10 +19,10 @@ admixture.par <- function()
     if(!is.null(haps))
     {
         gammas <- P.gammas(haps, P, Pm.prior, lambda, lambdaX, d, chr,
-                           A0, Ak, AX, gender, sex.chr, haps = TRUE, dev)
+                           A0, Ak, AX, gender, sex.chr, unphased = FALSE, dev)
     }else{
         gammas <- P.gammas(geno, P, Pm.prior, lambda, lambdaX, d, chr, A0, Ak, AX, gender, sex.chr,
-                           haps = FALSE, dev)
+                           unphased = TRUE, dev)
     }
 
 
