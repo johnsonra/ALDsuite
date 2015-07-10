@@ -4,6 +4,14 @@
 # CCR Collaborative Bioinformatics Resource
 # Leidos Biomedical Research, Inc
 
+library(parallel)
+library(foreach)
+library(doMC)
+registerDoMC(2)
+
+num_cores <- detectCores()
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
 
 setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6,
                         window = 0.1, unphased = TRUE, n.samp = 300)
@@ -99,7 +107,7 @@ setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6,
         }
 
 
-        for(rs in hapmap.sub$rs[hapmap.sub$rs %in% anchors])
+        foreach(rs %doPar% hapmap.sub$rs[hapmap.sub$rs %in% anchors])
         {
             ### Calculate PC Loadings ###
             tmp <- pca.setup(train, rs, hapmap.sub, thresh, maxpcs, window, n.samp, unphased)
