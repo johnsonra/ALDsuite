@@ -1,6 +1,6 @@
 *~
-testing
-testing/
+testing/*
+!*.R
 ALDsuite_0.*
 *.so
 *.o
