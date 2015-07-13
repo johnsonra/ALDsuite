@@ -75,11 +75,12 @@ setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6,
 
 
     ######### Set up priors #########
-    # this is where the phased haplotype training data will reside
-    train <- list(dat = NULL)
-
     for(i in unique(hapmap$chr))
     {
+        # this is where the phased haplotype training data will reside
+        train <- list(dat = NULL)
+
+        # get relevant subset of hapmap data
         hapmap.sub <- subset(hapmap, chr == i)
 
         ### Collect Traning Data for Chromosome i ###
