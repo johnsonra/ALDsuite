@@ -5,17 +5,17 @@
 # Leidos Biomedical Research, Inc
 
 library(parallel)
-library(foreach)
-library(doMC)
-registerDoMC(2)
 
-num_cores <- detectCores()
-cl <- makeCluster(num_cores)
-registerDoParallel(cl)
-
-setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6,
-                        window = 0.1, unphased = TRUE, n.samp = 300)
+setup.prior <- function(snps, pops, anchors = NULL, maxpcs = 6, thresh = 0.8, window = 0.1, unphased = TRUE, n.samp = 300, cores = detectCores(), cl = NULL, train.data, map = hapmap.sub)
 {
+	if(is.null(cl) & cores > 1)
+	{
+		cl <- makeCluster(cores)
+		stopCl <- TRUE 	
+	}else{
+		stopCl <- FALSE
+	}
+	
     if(!require(ALDdata))
         stop('ALDdata package required for setup.prior()')
 
@@ -45,10 +45,8 @@ setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6,
             }
         }
 
-
         # drop any uninformative markers
         hapmap <- subset(hapmap, score > 0)
-
 
         # pack the map with spacing of about at least cM.linked cM
         for(c in unique(hapmap$chr))
@@ -67,69 +65,60 @@ setup.prior <- function(snps, pops, anchors = NULL, thresh = 0.8, maxpcs = 6,
         # reorder anchors correctly
         anchors <- hapmap$rs[hapmap$rs %in% anchors]
     }
-
-    # initiate retval with "proper" ordering
-    retval <- lapply(anchors, function(x) list(freq = numeric(),
-                                               n = numeric()))
-    names(retval) <- anchors
-
-
-    ######### Set up priors #########
-    for(i in unique(hapmap$chr))
-    {
-        # this is where the phased haplotype training data will reside
-        train <- list(dat = NULL)
-
-        # get relevant subset of hapmap data
-        hapmap.sub <- subset(hapmap, chr == i)
-
-        ### Collect Traning Data for Chromosome i ###
-        for(k in pops)
-        {
-            if(k == 'CHB+JPT')
-            {
-                eval(parse(text = paste('data(chb', i, ', envir = environment())', sep = '')))
-                tmp <- phased
-                tmp2 <- LD
-
-                eval(parse(text = paste('data(jpt', i, ', envir = environment())', sep = '')))
-                phased <- rbind(tmp, phased)
-
-                LD <- merge(tmp2, LD, all = TRUE)
-            }else{
-                eval(parse(text = paste('data(', tolower(k), i, ', envir = environment())', sep = '')))
-            }
-
-            phased <- phased[,hapmap.sub$rs]
-            LD <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
-
-            train$dat <- rbind(train$dat, cbind(which(pops == k), phased[,hapmap.sub$rs]))
-            train[[k]] <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
-        }
-
-
-        foreach(rs %doPar% hapmap.sub$rs[hapmap.sub$rs %in% anchors])
-        {
-            ### Calculate PC Loadings ###
-            tmp <- pca.setup(train, rs, hapmap.sub, thresh, maxpcs, window, n.samp, unphased)
-
-            ### PC Regression ###
-            retval[[rs]] <- pcr.prior(tmp)
-
-            ### Drop training data ###
-            retval[[rs]]$train <- NULL
-        }
-    }
-
-    if(unphased)
+		
+	        if(cores > 1)
+		    {	
+			 	retval <- parLapply(cl, unique(chr), train.data, map = hapmap.sub, train.data, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors)
+		}else{
+			  	retval <- lapply(cl, unique(chr), train.data, map = hapmap$chr, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors)
+		 	 }
+		 	 
+	if(unphased)
     {
         class(retval) <- c('Pm.prior', 'unphased')
     }else{
         class(retval) <- c('Pm.prior', 'phased')
     }
 
-    return(retval)
-}
+    if(stopCl == TRUE)
+		stopCluster(cl)
+
+    return(retval) 
+} #end of setup.prior
+ 
+train.data <- function(i, hapmap, pops, thresh, maxpcs, window, n.samp, unphased)
+{ 
+    	train <- list(dat = NULL)
+
+		# get relevant subset of hapmap data
+        hapmap.sub <- subset(hapmap, chr == i)
+	
+    # initiate retval with "proper" ordering
+    retval <- lapply(anchors, function(x) list(freq = numeric, n = numeric()), simplify = TRUE, USE.NAMES = FALSE)
+    names(retval) <- anchors
+
+    ######### Set up priors #########
+	### Collect Traning Data for Chromosome i ###
+            if(k == 'CHB+JPT')
+            {
+                eval(parse(text = paste('data(chb', i, ', envir = environment())', sep = '')))
+                tmp <- phased
+                tmp2 <- LD	
+                eval(parse(text = paste('data(jpt', i, ', envir = environment())', sep = '')))
+                phased <- rbind(tmp, phased)
+                LD <- merge(tmp2, LD, all = TRUE)
+            }else{
+                	  	eval(parse(text = paste('data(', tolower(k), i, ', envir = environment())', sep = '')))
+                 }
+
+            phased <- phased[,hapmap.sub$rs]
+            LD <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
+
+            train$dat <- rbind(train$dat, cbind(which(pops == k), phased[hapmap.sub$rs]))
+            train[[k]] <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
+            
+            lapply(colnames(phased)[colnames(phased) %in% anchors], pcr.prior, train = train, map = hapmap.sub, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, anchors = anchors)
+} # end of train.data
 
 load.pop <- function(chr, k, rsList)
 {
@@ -145,13 +134,15 @@ load.pop <- function(chr, k, rsList)
         LD <- merge(tmp2, LD, all = TRUE)
     }else{
         eval(parse(text = paste('data(', tolower(k), chr, ', envir = environment())', sep = '')))
-    }
+         }
 
     phased <- phased[,rsList]
     LD <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
 
     return(list(phased = phased, LD = LD))
-}
+} # end of load.pop
+
+train.data(i, map = hapmap$chr, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased)
 
 # train = training data (list with one element per population, each with phased and LD data)
 # rs.cur = the SNP id we are calculating the priors for
@@ -159,8 +150,10 @@ load.pop <- function(chr, k, rsList)
 # thresh = percent of variation we want the PCs to explain
 # maxpcs = maximum number of PCs to track
 # window = window size (in cM)
-pca.setup <- function(train, rs.cur, map, thresh, maxpcs, window, n.samp, unphased)
+
+pcr.prior <- function(train, rs.cur, map, thresh, maxpcs, window, n.samp, unphased)
 {
+	##### Set up PCs #####
     pops <- names(train)[-1]
 
     # figure out what is linked in any population (including rs.cur)
@@ -245,59 +238,58 @@ pca.setup <- function(train, rs.cur, map, thresh, maxpcs, window, n.samp, unphas
         }
     }
 
-    return(model)
-}
-
-pcr.prior <- function(retval)
-{
+	##### PC Regression #####
     # responses
-    groups <- unique(retval$train[,1])
-    pops <- names(retval$freq)
+    groups <- unique(model$train[,1])
+    pops <- names(model$freq)
 
     # regression
-    if(dim(retval$train)[2] == 2)
+    if(dim(model$train)[2] == 2)
     {
-        X <- as.matrix(retval$train[,-1])
+        X <- as.matrix(model$train[,-1])
     }else{
-        X <- retval$train[,-1]
+        X <- model$train[,-1]
     }
 
     if(length(groups) == 2)
     {
-        y <- retval$train[,1] == groups[1]
+        y <- model$train[,1] == groups[1]
 
-        lreg <- logitreg(y, X %*% retval$eig)
+        lreg <- logitreg(y, X %*% model$eig)
 
-        retval$betas <- t(t(lreg$par)) # collect and name betas
-        colnames(retval$betas) <- pops[1]
+        model$betas <- t(t(lreg$par)) # collect and name betas
+        colnames(model$betas) <- pops[1]
     }else{
-        y <- sapply(groups, function(i) retval$train[,1] == i)
+        y <- sapply(groups, function(i) model$train[,1] == i)
 
-        lreg <- multilogitreg(y, X %*% retval$eig)
+        lreg <- multilogitreg(y, X %*% model$eig)
 
-        retval$betas <- lreg$par # collect and name betas
+        model$betas <- lreg$par # collect and name betas
 
         groups <- strsplit(as.character(groups), '.', fixed = TRUE)
         groups[[length(groups)]] <- NULL
-        colnames(retval$betas) <- paste(pops[as.numeric(sapply(groups, `[`, 1))],
+        colnames(model$betas) <- paste(pops[as.numeric(sapply(groups, `[`, 1))],
                                         pops[as.numeric(sapply(groups, `[`, 2))], sep = '.')
     }
 
     # collect variance/covariance and hessian matrices
-    retval$vcv <- lreg$vcv
-    retval$hessian <- lreg$hessian
+    model$vcv <- lreg$vcv
+    model$hessian <- lreg$hessian
 
 
     # some of these can be messed up...if any of the diagonals end up being nonpositive,
     # randomly sample - variance must be positive!!!
-    if(any(diag(retval$vcv) <= 0) | any(!is.finite(retval$vcv)))
+    if(any(diag(model$vcv) <= 0) | any(!is.finite(model$vcv)))
     {
-        retval$hessian <- rwish(2, diag(nrow = nrow(retval$hessian)))
-        retval$vcv <- solve(retval$hessian)
+        model$hessian <- rwish(2, diag(nrow = nrow(model$hessian)))
+        model$vcv <- solve(model$hessian)
     }
+    
+    # don't need training data in model
+    model$train <- NULL
 
-    return(retval)
-}
+    return(model)
+} # end of pcr.prior
 
 # I need this because the Fisher scoring algorithm used by default in glm
 # has problems when there is a perfect fit of the data...this happens in
@@ -350,7 +342,7 @@ logitreg <- function(y, x, wt = rep(1, length(y)), intercept = TRUE, start = rep
         fit$vcv <- solve.approx(fit$hessian) # variance covariance matrix
 
     invisible(fit)
-}
+} # end of logitreg
 
 # adaptation of logitreg for multinomial logistic regression
 # took out a lot from the function above, but used the relevant parts...
@@ -420,4 +412,4 @@ multilogitreg <- function(y, X, start = NULL, hessian = TRUE)
         fit$vcv <- solve.approx(fit$hessian) # variance covariance matrix
 
     invisible(fit)
-}
+} # end of mulrilogitreg
