@@ -68,7 +68,7 @@ setup.prior <- function(snps, pops, anchors = NULL, maxpcs = 6, thresh = 0.8, wi
 		
 	        if(cores > 1)
 		    {	
-			 	retval <- parLapply(cl, unique(chr), train.data, map = hapmap.sub, train.data, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors)
+			 	retval <- parLapply(cl, unique(chr), train.data, map = hapmap.sub, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors)
 		}else{
 			  	retval <- lapply(cl, unique(chr), train.data, map = hapmap$chr, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors)
 		 	 }
@@ -91,7 +91,7 @@ train.data <- function(i, hapmap, pops, thresh, maxpcs, window, n.samp, unphased
     	train <- list(dat = NULL)
 
 		# get relevant subset of hapmap data
-        hapmap.sub <- subset(hapmap, chr == i)
+        hapmap.sub <- subset(chr == i, hapmap)
 	
     # initiate retval with "proper" ordering
     retval <- lapply(anchors, function(x) list(freq = numeric, n = numeric()), simplify = TRUE, USE.NAMES = FALSE)
@@ -141,8 +141,6 @@ load.pop <- function(chr, k, rsList)
 
     return(list(phased = phased, LD = LD))
 } # end of load.pop
-
-train.data(i, map = hapmap$chr, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased)
 
 # train = training data (list with one element per population, each with phased and LD data)
 # rs.cur = the SNP id we are calculating the priors for
