@@ -68,11 +68,13 @@ setup.prior <- function(snps, pops, anchors = NULL, maxpcs = 6, thresh = 0.8, wi
 		
 	        if(cores > 1)
 		    {	
-			 	retval <- parLapply(cl, unique(hapmap$chr), train.data, hapmap = hapmap, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, phased = phased, unphased = unphased, anchors = anchors, LD = LD)
+			 	retval <- parLapply(cl, unique(hapmap$chr), train.data, hapmap = hapmap, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors, LD = LD)
 		}else{
-			  	retval <- lapply(unique(hapmap$chr), train.data, hapmap = hapmap, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, phased = phased, anchors = anchors, LD = LD)
+			  	retval <- lapply(unique(hapmap$chr), train.data, hapmap = hapmap, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors, LD = LD)
 		 	 }
 		 	 
+    retval <- unlist(retval, recursive = FALSE)
+    
 	if(unphased)
     {
         class(retval) <- c('Pm.prior', 'unphased')
@@ -88,6 +90,10 @@ setup.prior <- function(snps, pops, anchors = NULL, maxpcs = 6, thresh = 0.8, wi
  
 train.data <- function(i, hapmap, pops, thresh, maxpcs, window, n.samp, unphased, anchors, LD)
 { 
+    if(!require(ALDdata))
+        stop("ALDdata required to use this function.")
+
+#	browser()
     	train <- list(dat = NULL)
 
 		# get relevant subset of hapmap data
@@ -116,33 +122,18 @@ train.data <- function(i, hapmap, pops, thresh, maxpcs, window, n.samp, unphased
             phased <- phased[,hapmap.sub$rs]
             LD <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
 
-            train$dat <- rbind(train$dat, cbind(which(pops == k), phased[hapmap.sub$rs]))
+            train$dat <- rbind(train$dat, cbind(which(pops == k), phased[,hapmap.sub$rs]))
             train[[k]] <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
      }  
-            lapply(colnames(phased)[colnames(phased) %in% anchors], pcr.prior, train = train, map = hapmap.sub, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, anchors = anchors)
+            retval <- lapply(colnames(phased)[colnames(phased) %in% anchors], pcr.prior, train = train, map = hapmap.sub, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased)
+            
+            # assaign to the elements in anchors
+            names(retval) <- anchors
+
+	return(retval)				            	
+            
 } # end of train.data
 
-load.pop <- function(chr, k, rsList)
-{
-    if(k == 'CHB+JPT')
-    {
-        eval(parse(text = paste('data(chb', chr, ', envir = environment())', sep = '')))
-        tmp <- phased
-        tmp2 <- LD
-
-        eval(parse(text = paste('data(jpt', chr, ', envir = environment())', sep = '')))
-        phased <- rbind(tmp, phased)
-
-        LD <- merge(tmp2, LD, all = TRUE)
-    }else{
-        eval(parse(text = paste('data(', tolower(k), chr, ', envir = environment())', sep = '')))
-         }
-
-    phased <- phased[,rsList]
-    LD <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
-
-    return(list(phased = phased, LD = LD))
-} # end of load.pop
 
 # train = training data (list with one element per population, each with phased and LD data)
 # rs.cur = the SNP id we are calculating the priors for
