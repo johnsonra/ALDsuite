@@ -6,7 +6,7 @@
 
 library(parallel)
 
-setup.prior <- function(snps, pops, anchors = NULL, maxpcs = 6, thresh = 0.8, window = 0.1, unphased = TRUE, n.samp = 300, cores = detectCores(), cl = NULL, train.data, map = hapmap.sub)
+setup.prior <- function(snps, pops, anchors = NULL, maxpcs = 6, thresh = 0.8, window = 0.1, unphased = TRUE, n.samp = 300, cores = detectCores(), cl = NULL)
 {
 	if(is.null(cl) & cores > 1)
 	{
@@ -68,9 +68,9 @@ setup.prior <- function(snps, pops, anchors = NULL, maxpcs = 6, thresh = 0.8, wi
 		
 	        if(cores > 1)
 		    {	
-			 	retval <- parLapply(cl, unique(chr), train.data, map = hapmap.sub, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors)
+			 	retval <- parLapply(cl, unique(hapmap$chr), train.data, hapmap = hapmap, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, phased = phased, unphased = unphased, anchors = anchors, LD = LD)
 		}else{
-			  	retval <- lapply(cl, unique(chr), train.data, map = hapmap$chr, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors)
+			  	retval <- lapply(unique(hapmap$chr), train.data, hapmap = hapmap, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, phased = phased, anchors = anchors, LD = LD)
 		 	 }
 		 	 
 	if(unphased)
@@ -86,19 +86,21 @@ setup.prior <- function(snps, pops, anchors = NULL, maxpcs = 6, thresh = 0.8, wi
     return(retval) 
 } #end of setup.prior
  
-train.data <- function(i, hapmap, pops, thresh, maxpcs, window, n.samp, unphased)
+train.data <- function(i, hapmap, pops, thresh, maxpcs, window, n.samp, unphased, anchors, LD)
 { 
     	train <- list(dat = NULL)
 
 		# get relevant subset of hapmap data
-        hapmap.sub <- subset(chr == i, hapmap)
+        hapmap.sub <- subset(hapmap, chr == i)
 	
     # initiate retval with "proper" ordering
-    retval <- lapply(anchors, function(x) list(freq = numeric, n = numeric()), simplify = TRUE, USE.NAMES = FALSE)
+    retval <- lapply(anchors, function(x) list(freq = numeric, n = numeric()))
     names(retval) <- anchors
 
     ######### Set up priors #########
 	### Collect Traning Data for Chromosome i ###
+	for(k in pops)
+	{
             if(k == 'CHB+JPT')
             {
                 eval(parse(text = paste('data(chb', i, ', envir = environment())', sep = '')))
@@ -116,7 +118,7 @@ train.data <- function(i, hapmap, pops, thresh, maxpcs, window, n.samp, unphased
 
             train$dat <- rbind(train$dat, cbind(which(pops == k), phased[hapmap.sub$rs]))
             train[[k]] <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
-            
+     }  
             lapply(colnames(phased)[colnames(phased) %in% anchors], pcr.prior, train = train, map = hapmap.sub, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, anchors = anchors)
 } # end of train.data
 
