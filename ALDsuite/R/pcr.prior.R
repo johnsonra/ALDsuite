@@ -66,12 +66,12 @@ setup.prior <- function(snps, pops, anchors = NULL, maxpcs = 6, thresh = 0.8, wi
         anchors <- hapmap$rs[hapmap$rs %in% anchors]
     }
 		
-	        if(cores > 1)
-		    {	
-			 	retval <- parLapply(cl, unique(hapmap$chr), train.data, hapmap = hapmap, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors, LD = LD)
-		}else{
-			  	retval <- lapply(unique(hapmap$chr), train.data, hapmap = hapmap, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors, LD = LD)
-		 	 }
+	if(cores > 1)
+	{	
+		retval <- parLapply(cl, unique(hapmap$chr), train.data, hapmap = hapmap, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors, LD = LD)
+	}else{
+		retval <- lapply(unique(hapmap$chr), train.data, hapmap = hapmap, pops = pops, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased, anchors = anchors, LD = LD)
+		  }
 		 	 
     retval <- unlist(retval, recursive = FALSE)
     
@@ -92,12 +92,11 @@ train.data <- function(i, hapmap, pops, thresh, maxpcs, window, n.samp, unphased
 { 
     if(!require(ALDdata))
         stop("ALDdata required to use this function.")
+        
+    train <- list(dat = NULL)
 
-#	browser()
-    	train <- list(dat = NULL)
-
-		# get relevant subset of hapmap data
-        hapmap.sub <- subset(hapmap, chr == i)
+	# get relevant subset of hapmap data
+    hapmap.sub <- subset(hapmap, chr == i)
 	
     # initiate retval with "proper" ordering
     retval <- lapply(anchors, function(x) list(freq = numeric, n = numeric()))
@@ -116,24 +115,23 @@ train.data <- function(i, hapmap, pops, thresh, maxpcs, window, n.samp, unphased
                 phased <- rbind(tmp, phased)
                 LD <- merge(tmp2, LD, all = TRUE)
             }else{
-                	  	eval(parse(text = paste('data(', tolower(k), i, ', envir = environment())', sep = '')))
+                  	eval(parse(text = paste('data(', tolower(k), i, ', envir = environment())', sep = '')))
                  }
 
-            phased <- phased[,hapmap.sub$rs]
-            LD <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
+		phased <- phased[,hapmap.sub$rs]
+		LD <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
 
-            train$dat <- rbind(train$dat, cbind(which(pops == k), phased[,hapmap.sub$rs]))
-            train[[k]] <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
-     }  
-            retval <- lapply(colnames(phased)[colnames(phased) %in% anchors], pcr.prior, train = train, map = hapmap.sub, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased)
+    	train$dat <- rbind(train$dat, cbind(which(pops == k), phased[,hapmap.sub$rs]))
+    	train[[k]] <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
+    }  
+    retval <- lapply(colnames(phased)[colnames(phased) %in% anchors], pcr.prior, train = train, map = hapmap.sub, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased)
             
-            # assaign to the elements in anchors
-            names(retval) <- anchors
-
+    # assaign to the elements in anchors
+    names(retval) <- anchors
+    
 	return(retval)				            	
             
 } # end of train.data
-
 
 # train = training data (list with one element per population, each with phased and LD data)
 # rs.cur = the SNP id we are calculating the priors for
@@ -202,7 +200,7 @@ pcr.prior <- function(train, rs.cur, map, thresh, maxpcs, window, n.samp, unphas
         }
 
         # replace phased data with unphased data
-        model$train <- genos
+    	model$train <- genos
     }
 
     # if only one marker, no need to calculate eigenvectors
