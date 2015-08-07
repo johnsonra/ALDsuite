@@ -98,9 +98,9 @@ train.data <- function(i, hapmap, pops, thresh, maxpcs, window, n.samp, unphased
 	# get relevant subset of hapmap data
     hapmap.sub <- subset(hapmap, chr == i)
 	
-    # initiate retval with "proper" ordering
-    retval <- lapply(anchors, function(x) list(freq = numeric, n = numeric()))
-    names(retval) <- anchors
+    # # initiate retval with "proper" ordering
+    # retval <- lapply(anchors, function(x) list(freq = numeric, n = numeric()))
+    # names(retval) <- anchors
 
     ######### Set up priors #########
 	### Collect Traning Data for Chromosome i ###
@@ -124,10 +124,10 @@ train.data <- function(i, hapmap, pops, thresh, maxpcs, window, n.samp, unphased
     	train$dat <- rbind(train$dat, cbind(which(pops == k), phased[,hapmap.sub$rs]))
     	train[[k]] <- subset(LD, rs1 %in% colnames(phased) & rs2 %in% colnames(phased))
     }  
-    retval <- lapply(colnames(phased)[colnames(phased) %in% anchors], pcr.prior, train = train, map = hapmap.sub, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased)
+    retval <- lapply(anchors[anchors %in% colnames(phased)], pcr.prior, train = train, map = hapmap.sub, thresh = thresh, maxpcs = maxpcs, window = window, n.samp = n.samp, unphased = unphased)
             
     # assaign to the elements in anchors
-    names(retval) <- anchors
+    names(retval) <- anchors[anchors %in% colnames(phased)]
     
 	return(retval)				            	
             
