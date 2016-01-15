@@ -535,7 +535,7 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                                      {
                                          Pm.prior[[j]]$betas <- mixing*Pm.prior[[j]]$betas +
                                                                 (1 - mixing)*Pm.prior.r[[j]]$betas
-                                         Pm.prior[[j]]$vcv <- mixing*Pm.prior[[j]]$$vcv +
+                                         Pm.prior[[j]]$vcv <- mixing*Pm.prior[[j]]$vcv +
                                                               (1 - mixing)*Pm.prior.r[[j]]$vcv
                                          Pm.prior[[j]]$hessian <- mixing*Pm.prior[[j]]$hessian +
                                                                   (1 - mixing)*Pm.prior.r[[j]]$hessian
