@@ -33,7 +33,7 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
         marker.id <- names(Pm.prior)
 
     if(is.null(pop.id))
-        stop("pop.id is missing")
+        pop.id <- names(Pm.prior[[1]][[3]])
 
 
 ######### Type checks #########
