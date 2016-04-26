@@ -18,6 +18,9 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
     if(!is.null(haps))
     {
+        if(is.data.frame(dat))
+            dat <- as.matrix(dat)
+
         tmp <- array(0, dim = c(dim(haps)[1] / 2, dim(haps)[2], 2),
                      dimnames = list(dimnames(haps)[[1]][1:(dim(haps)[1]/2) * 2 - 1],
                                      dimnames(haps)[[2]], c('Mother', 'Father')))
@@ -65,8 +68,14 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
 
 ######### Gender #########
-    W <- which(gender == 'F')
-    M <- which(gender == 'M')
+    if(is.null(gender))
+    {
+        W <- 1:length(ids)
+        M <- numeric()
+    }else{
+        W <- which(gender == 'F')
+        M <- which(gender == 'M')
+    }
 
 
 ######### Distances #########

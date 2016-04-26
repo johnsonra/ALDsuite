@@ -1,52 +1,30 @@
 # asw.R
 # Run ASW data through ALDsuite
 # Randall Johnson
-# CCR Collaborative Bioinformatics Resrouce at Frederick National Laboratory
 # Leidos Biomedical Research, Inc
 
 
 library(ALDdata)
 library(ALDsuite)
 
-# load raw phased ASW data from chromosome 22
-data(asw)
+### load raw phased ASW data from chromosome 22 ###
+data(asw20)
 
-# format for admixture()
-rownames(asw) <- asw$rsID
-asw$rsID <- NULL
-asw$position_b36 <- NULL
+# make unphased data
+index <- seq(from = 1, length = dim(phased)[1] / 2, by = 2)
+geno <- phased[index,] + phased[index + 1,]
 
-# get reference information from YRI and convert to appropriate format
-data(hapmap)
-hapmap <- subset(hapmap, rs %in% rownames(asw))
-hapmap <- hapmap[order(hapmap$pos),]
-asw <- asw[hapmap$rs,] # make sure we are ordered the same!!!
+### drop monomorphic markers ###
+mono <- apply(phased, 2, sum) == 0
 
-geno <- t(categorize(as.matrix(asw), ref = hapmap$ref, collapse = TRUE)) # unphased
-
-haps <- t(categorize(as.matrix(asw), ref = hapmap$ref, collapse = FALSE)) # phased
-## hap1 <- seq(from = 1, to = dim(haps)[1] - 1, by = 2)
-## hap2 <- hap1 + 1
-
-## tmp <- array(dim = c(length(hap1), dim(haps)[2], 2),
-##              dimnames = list(rownames(haps)[hap1], colnames(haps), c('h1', 'h2')))
-## tmp[,,1] <- haps[hap1,]
-## tmp[,,2] <- haps[hap2,]
-
-## haps <- tmp
-## rm(tmp)
-
-# drop monomorphic markers
-mono <- apply(geno, 2, sum) == 0
-
+phased <- phased[,!mono]
 geno <- geno[,!mono]
-haps <- haps[,!mono]
-hapmap <- subset(hapmap, rs %in% colnames(geno))
 
-# generate our PCR prior on a subsample of the rs numbers
+
+### generate our PCR prior on a subsample of the rs numbers ###
 set.seed(2380947)
-Pm.prior <- setup.prior(hapmap$rs, c('YRI', 'CEU'), maxpcs = NULL, window = 0.1, unphased = FALSE)
-Pm.prior.geno <- setup.prior(names(Pm.prior)[1:10], c('YRI', 'CEU'), window = 0.1, unphased = TRUE)
+Pm.prior <- setup.prior(colnames(phased), c('YRI', 'CEU'), maxpcs = NULL, window = 0.1, phased = TRUE)
+Pm.prior.geno <- setup.prior(names(Pm.prior)[1:10], c('YRI', 'CEU'), window = 0.1, phased = FALSE)
 
 # set up the remaining variables for admixture (this isn't strictly needed...move this over to the testing script)
 gender <- rep('M', dim(geno)[1])
@@ -84,10 +62,11 @@ A0 <- NULL
 Ak <- NULL
 run.checks <- TRUE
 
-save.image(file = 'asw0.4.3.RData')
+save.image(file = 'asw.RData')
 
 if(TRUE)
 {
+    out.phased <- admixture(Pm.prior, phased, chr = rep(20, length(Pm.prior)), pos = hapmap$cM[hapmap$rs %in% names(Pm.prior)], burn = 0, iter = 1)
     system.time(out.phased <- admixture(Pm.prior = Pm.prior, haps = haps, geno = NULL, gender = gender,
                                         chr = chr, pos = pos, burn = burn, iter = iter, every = every,
                                         indiv.id = indiv.id, marker.id = marker.id, pop.id = pop.id,
