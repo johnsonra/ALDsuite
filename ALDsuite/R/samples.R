@@ -1,10 +1,8 @@
 # samples.R
 # Sampling functions
 # Randall Johnson
-# BSP CCR Genetics Core at Frederick National Laboratory for Cancer Research
-# SAIC-Frederick, Inc
-# Created September 11, 2012
-# Last Modified April 7, 2014
+# Data Science and Information Technology Program
+# Frederick National Laboratory
 
 
 ##########################################################################
@@ -43,7 +41,7 @@ sample.G <- function(gammas, lambda, d)
 
     # identify double transitions -- two in a row (i.e. ancestries like 1 1 2 1 1)
     doubles[,-dim(G)[2],,] <- doubles[,-1,,] & doubles[,-dim(G)[2],,]
-    doubles[,dim(G),,] <- FALSE
+    doubles[,dim(G)[2],,] <- FALSE
 
     # get rid of double transitions, conditional on gammas
     for(i in 1:dim(doubles)[1])
