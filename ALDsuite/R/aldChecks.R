@@ -26,7 +26,7 @@ ald.qc <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, 
     if(!is.null(haps) & is.null(dimnames(haps)[[2]]))
         stop("Missing marker names for haps.")
 
-    if(is.null(dimnames(geno)[[2]]))
+    if(!is.null(geno) & is.null(dimnames(geno)[[2]]))
         stop("Missing marker names for geno.")
 
     if(is.null(indiv.id))
@@ -159,8 +159,9 @@ ald.qc <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, 
         warning(sum(dimnames(geno)[[1]] != indiv.id), " individual names in geno do not match indiv.id.")
 
     # gender format check
-    if(!is.null(gender) & length(gender) != dim(geno)[1])
-        stop("Length of gender should be ", dim(geno)[1], '.')
+    if(!is.null(gender) & !is.null(geno))
+        if(length(gender) != dim(geno)[1])
+            stop("Length of gender should be ", dim(geno)[1], '.')
 
     # names of Pm.prior should be in column names of haps (and geno?)-needs to be updated
     if(!is.null(Pm.prior))
