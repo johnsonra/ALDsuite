@@ -364,12 +364,12 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
                                'burnin', 'burn.lik', 'iter.lik', 'sigmaA', 'sigmaL', 'debug'),
                       envir = environment())
 
-        # get system pids for each subprocess
-        ids <- unlist(clusterEvalQ(cl, id <- Sys.getpid()))
-        clusterExport(cl, list('ids'))
+        ## # get system pids for each subprocess
+        ## ids <- unlist(clusterEvalQ(cl, id <- Sys.getpid()))
+        ## clusterExport(cl, list('ids'))
 
-        # now relabel them from 1:cores
-        clusterEvalQ(cl, id <- which(id == ids))
+        ## # now relabel them from 1:cores
+        ## clusterEvalQ(cl, id <- which(id == ids))
 
     }else{
         stop.cl <- FALSE
@@ -393,8 +393,8 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
             {
                 clusterExport(cl, list('supercyc'), envir = environment())
 
-                if(verbose) # report on progress
-                    invisible(sapply(clusterEvalQ(cl, (supercyc - 1) * cores + id), cat, '\n'))
+                ## if(verbose) # report on progress
+                ##     invisible(sapply(clusterEvalQ(cl, (supercyc - 1) * cores + id), cat, '\n'))
 
                 invisible(clusterEvalQ(cl, eval(hmm)))
             }else{

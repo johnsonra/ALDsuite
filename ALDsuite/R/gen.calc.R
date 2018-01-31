@@ -1,13 +1,14 @@
 # gen.calc.R
 # Calculate genetic position based on Matise et al map
 # Randy Johnson
-# Laboratory of Genomic Diversity at NCI Frederick
-# SAIC Frederick, Inc
-# Created November 14, 2006
-# Last Modified October 30, 2013
+# CCR Collaborative Bioinformatics Resource at Frederick National Laboratory
+# Leidos Biomedical Research, Inc
 
 gen.calc <- function(chrom, pos, n.extrap = 20, map = 'rutgers37', warn = FALSE)
 {
+    if(!require(ALDdata))
+        stop("ALDdata package required for gen.calc -- please see https://github.com/johnsonra/ALDdata")
+
     if(length(chrom) != length(pos))
         stop("chrom and pos must be of the same length.")
 

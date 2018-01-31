@@ -14,16 +14,19 @@
 ##### be sure all variables are formatted properly #####
 ######## check for quality of genetic data, too ########
 
-ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, indiv.id,
-                   marker.id, pop.id, lambda, tau, omega, rand.seed, cores, cl, dev,
-                   verbose, debug, sex.chr, indiv.geno.check, marker.geno.check,
-                   hwe.thresh, bad.indiv, bad.marker, male.het.X, fast, A0, Ak)
+ald.qc <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, burn = 0,
+                   iter = 1, every = 1, indiv.id = NULL, marker.id = NULL, pop.id = NULL,
+                   lambda = 8, tau = 300, omega = NULL, rand.seed = NULL, cores = detectCores(),
+                   cl = NULL, dev = FALSE, verbose = TRUE, debug = FALSE, sex.chr = 23,
+                   indiv.geno.check = 0.98, marker.geno.check = 0.98, hwe.thresh = 1e-4,
+                   bad.indiv = NULL, bad.marker = NULL, male.het.X = 1, fast = FALSE,
+                   A0 = NULL, Ak = NULL, verboseWarnings = FALSE)
 {
 ######### make sure we have things defined #########
     if(!is.null(haps) & is.null(dimnames(haps)[[2]]))
         stop("Missing marker names for haps.")
 
-    if(is.null(dimnames(geno)[[2]]))
+    if(!is.null(geno) & is.null(dimnames(geno)[[2]]))
         stop("Missing marker names for geno.")
 
     if(is.null(indiv.id))
@@ -132,8 +135,9 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
         marker.geno.check <- 0.98
     }
 
-    if(!is.null(pop.id) & length(pop.id) != length(Pm.prior[[1]]$freq))
-        stop("Incorrect length of pop.id.")
+    if(!is.null(Pm.prior))
+        if(!is.null(pop.id) & length(pop.id) != length(Pm.prior[[1]]$freq))
+            stop("Incorrect length of pop.id.")
 
     # other data types
     if(!is.null(cl) & !"cluster" %in% class(cl))
@@ -155,12 +159,14 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
         warning(sum(dimnames(geno)[[1]] != indiv.id), " individual names in geno do not match indiv.id.")
 
     # gender format check
-    if(!is.null(gender) & length(gender) != dim(geno)[1])
-        stop("Length of gender should be ", dim(geno)[1], '.')
+    if(!is.null(gender) & !is.null(geno))
+        if(length(gender) != dim(geno)[1])
+            stop("Length of gender should be ", dim(geno)[1], '.')
 
     # names of Pm.prior should be in column names of haps (and geno?)-needs to be updated
-    if(!all(names(Pm.prior) %in% dimnames(geno)[[2]]))
-        stop("Each element of Pm.prior must be associated with a column of geno.")
+    if(!is.null(Pm.prior))
+        if(!all(names(Pm.prior) %in% dimnames(geno)[[2]]))
+            stop("Each element of Pm.prior must be associated with a column of geno.")
 
     if(!is.null(haps))
     {
@@ -169,31 +175,35 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
             warning(sum(dimnames(haps)[[1]] != indiv.id), " individual names in haps do not match indiv.id.")
 
         # names of Pm.prior should be in column names of haps (and geno?)-needs to be updated
-        if(!all(names(Pm.prior) %in% dimnames(haps)[[2]]))
-            stop("Each element of Pm.prior must be associated with a column of geno.")
+        if(!is.null(Pm.prior))
+            if(!all(names(Pm.prior) %in% dimnames(haps)[[2]]))
+                stop("Each element of Pm.prior must be associated with a column of geno.")
     }
 
     if(any(names(gender) != indiv.id))
         warning(sum(names(gender) != indiv.id), " names of the gender variable do not match indiv.id.")
 
     # chr format check
-    if(length(chr) != length(Pm.prior))
-        stop("Length of chr should be ", length(Pm.prior), '.')
+    if(!is.null(Pm.prior))
+        if(length(chr) != length(Pm.prior))
+            stop("Length of chr should be ", length(Pm.prior), '.')
 
     if(any(names(chr) != marker.id))
         warning(sum(names(chr) != marker.id), " names of the chr variable do not match marker.id.")
 
-    # Pm.prior format check
-    if(!all(names(Pm.prior[[1]][[3]]) == pop.id) & !is.null(pop.id))
-        stop("Pm.prior must have the same names as pop.id when pop.id is not null.")
+    if(!is.null(Pm.prior))
+    {
+        # Pm.prior format check
+        if(!all(names(Pm.prior[[1]][[3]]) == pop.id) & !is.null(pop.id))
+            stop("Pm.prior must have the same names as pop.id when pop.id is not null.")
 
     # pos/d format check
     if(length(names(Pm.prior)) != length(pos))
         stop("Length of pos (", length(pos),  ") should be match length of Pm.prior (",
              length(names(Pm.prior)), ').')
 
-    if(any(names(Pm.prior) != marker.id))
-        stop("Each marker in Pm.prior needs to be present in marker.id when not null.")
+        if(any(names(Pm.prior) != marker.id))
+            stop("Each marker in Pm.prior needs to be present in marker.id when not null.")
 
     if(any(sapply(Pm.prior, function(x) !all(names(x) == c('freq', 'n', 'linked', 'd', 'eig', 'betas', 'vcv',
                                                            'hessian')))))
@@ -339,4 +349,10 @@ ald.qc <- function(Pm.prior, haps, geno, gender, chr, pos, burn, iter, every, in
         warning(sum(hwe < hwe.thresh), " markers failed HWE test.")
 
 ##### check for allele flips later on in the process #####
+
+    if(verboseWarnings)
+        return(list(sex.check = sex.check,
+                    indiv.check = indiv.check,
+                    marker.check = marker.check,
+                    hwe = hwe))
 }

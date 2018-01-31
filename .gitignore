@@ -2,6 +2,9 @@
 testing/*
 !*.R
 ALDsuite_0.*
+*.RData
+data/
+data
 *.so
 *.o
 *.history
