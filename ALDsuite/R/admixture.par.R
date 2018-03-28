@@ -78,11 +78,14 @@ admixture.par <- function()
     }
 
     # update gammas
-    gammas <- G.tmp / n
-    rm(G.tmp)
-
-    # take maximum likelihood estimate of G for update of parameters? Less noisy...
-    G <- ML.G(gammas)
+    if(nburn + niter < 1)
+    {
+        gammas <- G.tmp / n
+        rm(G.tmp)
+        
+        # take maximum likelihood estimate of G for update of parameters? Less noisy...
+        G <- ML.G(gammas)
+    }
 
 
     point <- 4

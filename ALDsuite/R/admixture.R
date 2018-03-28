@@ -5,8 +5,8 @@
 # Leidos Biomedical Research, Inc
 
 # see documentation for details on these arguments
-admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, burn = 100,
-                      iter = 200, every = 5, indiv.id = NULL, marker.id = NULL, pop.id = NULL,
+admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, burn = 0,
+                      iter = 1, every = 1, indiv.id = NULL, marker.id = NULL, pop.id = NULL,
                       lambda = 9, tau = 300, omega = NULL, rand.seed = NULL,
                       cores = detectCores(), cl = NULL, dev = FALSE, verbose = TRUE,
                       debug = FALSE, sex.chr = 23, indiv.geno.check = 0.98,
@@ -104,6 +104,10 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
 
 
 ######### starting estimate of ancestral allele frequencies #########
+    # check pull marker.id and pop.id if not given - assuming they are defined in Pm.prior
+    pop.id <- names(Pm.prior[[1]]$freq)
+    marker.id <- names(Pm.prior)
+    
     P <- matrix(NA, nrow = length(Pm.prior), ncol = length(Pm.prior[[1]]$freq),
                 dimnames = list(marker.id, pop.id))
 
@@ -658,9 +662,9 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
         # divisor (this could be different if fast == TRUE)
         if(fast)
         {
-            divisor <- floor(iter / every)
+            divisor <- max(floor(iter / every), 1)
         }else{
-            divisor <- cores * floor(niter / every)
+            divisor <- max(cores * floor(niter / every), 1)
         }
 
         final$A0 <- final$A0 / divisor
