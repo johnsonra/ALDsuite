@@ -36,7 +36,7 @@ ald.qc <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, 
         marker.id <- names(Pm.prior)
 
     if(is.null(pop.id))
-        pop.id <- names(Pm.prior[[1]][[3]])
+        pop.id <- names(Pm.prior[[1]]$freq)
 
 
 ######### Type checks #########
@@ -194,8 +194,21 @@ ald.qc <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, 
     if(!is.null(Pm.prior))
     {
         # Pm.prior format check
-        if(!all(names(Pm.prior[[1]][[3]]) == pop.id) & !is.null(pop.id))
-            stop("Pm.prior must have the same names as pop.id when pop.id is not null.")
+        if(!is.null(pop.id))
+        {
+            # might be unphased data
+            if(is.null(haps))
+            {
+                expectedModelNames <- sapply(pop.id, paste, pop.id, sep = '.')
+                expectedModelNames <- expectedModelNames[!upper.tri(expectedModelNames)]
+                
+                if(!all(names(Pm.prior[[1]]$model) == expectedModelNames))
+                    stop("Pm.prior appears not to have the correct model names.")
+            }else{
+                if(!all(names(Pm.prior[[1]][[3]]) == pop.id))
+                    stop("Pm.prior must have the same names as pop.id when pop.id is not null.")
+            }
+        }
 
         # pos/d format check
         if(length(names(Pm.prior)) != length(pos))
@@ -204,8 +217,9 @@ ald.qc <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, 
         if(any(names(Pm.prior) != marker.id))
             stop("Each marker in Pm.prior needs to be present in marker.id when not null.")
 
+        K <- length(Pm.prior[[1]]$freq) # number of populations
         if(any(unlist(lapply(Pm.prior, length)) != 3) | # each marker should have 3 elements
-           length(table(unlist(lapply(Pm.prior, lapply, length)))) != 1) # each element should have length K
+           !all(unlist(lapply(Pm.prior, lapply, length)) %in% c(K, K^2 - choose(K,2)))) # each element should have length K unless data are unphased
             stop("Formatting error in Pm.prior detected.")
     }
 
@@ -248,8 +262,14 @@ ald.qc <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, 
     }
 
 ########## check for complete genotyping (by individual / by marker) ##########
-    indiv.check <- apply(!is.na(haps), 1, sum) / dim(haps)[2]
-    marker.check <- apply(!is.na(haps), 2, sum) / dim(haps)[1]
+    if(!is.null(haps))
+    {
+        indiv.check <- apply(!is.na(haps), 1, sum) / dim(haps)[2]
+        marker.check <- apply(!is.na(haps), 2, sum) / dim(haps)[1]
+    }else{# assume some data was given...
+        indiv.check <- apply(!is.na(geno), 1, sum) / dim(geno)[2]
+        marker.check <- apply(!is.na(geno), 2, sum) / dim(geno)[1]
+    }
 
     if(any(indiv.check < indiv.geno.check))
         warning(sum(indiv.check < indiv.geno.check), " individuals with less than ",

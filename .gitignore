@@ -12,3 +12,4 @@ data
 *.xcodeproj
 *.xcodeproj/
 Icon*
+*.rds

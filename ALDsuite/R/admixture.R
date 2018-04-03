@@ -6,9 +6,9 @@
 
 # see documentation for details on these arguments
 admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, pos, burn = 0,
-                      iter = 1, every = 1, indiv.id = NULL, marker.id = NULL, pop.id = NULL,
+                      iter = 1, every = 5, indiv.id = NULL, marker.id = NULL, pop.id = NULL,
                       lambda = 9, tau = 300, omega = NULL, rand.seed = NULL,
-                      cores = detectCores(), cl = NULL, dev = FALSE, verbose = TRUE,
+                      cores = detectCores(), cl = NULL, dev = FALSE, verbose = FALSE,
                       debug = FALSE, sex.chr = 23, indiv.geno.check = 0.98,
                       marker.geno.check = .98, hwe.thresh = 1e-4, bad.indiv = NULL,
                       male.het.X = 1, fast = FALSE, A0 = NULL, Ak = NULL, run.checks = TRUE)
@@ -357,7 +357,8 @@ admixture <- function(Pm.prior, haps = NULL, geno = NULL, gender = NULL, chr, po
         clusterExport(cl, list('hmm', 'haps', 'geno', 'P', 'lambda', 'lambdaX', 'd', 'chr', 'A0', 'Ak', 'AX',
                                'gender', 'sex.chr', 'dev', 'omega', 'omegaX', 'W', 'M', 'alpha', 'alphaX',
                                'Pm', 'Pm.counts', 'Pm.prior', 'every', 'tau', 'verbose', 'cores',
-                               'burnin', 'burn.lik', 'iter.lik', 'sigmaA', 'sigmaL', 'debug'),
+                               'burnin', 'burn.lik', 'iter.lik', 'sigmaA', 'sigmaL', 'debug', 'nburn', 'niter',
+                               'iter'),
                       envir = environment())
 
         ## # get system pids for each subprocess

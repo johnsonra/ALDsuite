@@ -208,7 +208,13 @@ admixture.par <- function()
     {
         final$A0 <- final$A0 + A0
         final$Ak <- final$Ak + Ak
-        final$gammas <- final$gammas + G
+        # if only 1 iteration, use the gammas directly rather than G
+        if(iter == 1)
+        {
+            final$gammas <- gammas
+        }else{
+            final$gammas <- final$gammas + G
+        }
         final$lambda <- final$lambda + lambda
         final$lambdaX <- final$lambdaX + lambdaX
         final$P <- final$P + P
