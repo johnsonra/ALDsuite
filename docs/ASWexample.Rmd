@@ -1,0 +1,139 @@
+---
+title: "ALDsuite: Dense marker MALD using principal components of ancestral linkage disequilibrium"
+author: "Randy Johnson"
+date: "8/15/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ALDdata)
+library(ALDsuite)
+```
+
+## Installation
+This installation of the ALDsuite package assumes:
+
+* a compiler (e.g. gcc), 
+* git,
+* R and the following packages:
+    * mvtnorm
+    * hwde
+    * gdata (recommended)
+    * ncdf4 (recommended)
+
+To install the ALDdata package issue the following commands in the terminal window after navigating to the directory where you want the source files to reside:
+
+```
+git clone https://github.com/johnsonra/ALDdata
+cd ALDdata
+R CMD INSTALL ALDdata
+cd ..
+
+git clone https://github.com/johnsonra/ALDsuite
+cd ALDsuite
+R CMD INSTALL ALDsuite
+```
+
+At this point the source directories may be deleted.
+
+## Inferring local ancestry
+
+### Training on HapMap data
+
+Before you train your model using HapMap data, we need to know which markers you will be using. If you have a list of polymorphic rs numbers, you can skip this step, but for this example we are going to train the model for chromosome 20 using the phased ASW data from HapMap.
+
+```{r Get SNPs}
+require(ALDdata)
+data(asw20)
+```
+
+We also want to do a little quality control of our data:
+
+```{r QC}
+##### drop monomorphic SNPs #####
+mono <- apply(phased, 2, sum) == 0
+phased <- phased[,!mono]
+
+##### check for HWE problems #####
+
+# each individual has two chromosome in this data set
+chrA <- (1:(nrow(phased)/2)) * 2 # indices for chromosome A
+chrB <- chrA - 1                 # indices for chromosome B
+
+genotypes <- phased[chrA,] + phased[chrB,]
+
+require(hwde)
+hweScore <- hwexact(apply(genotypes == 0, 2, sum), # observed homozygote 0
+                    apply(genotypes == 1, 2, sum), # observed hets
+                    apply(genotypes == 2, 2, sum)) # observed homozygote 1
+
+phased <- phased[,!hweScore < 1e-4]
+genotypes <- genotypes[,!hweScore < 1e-4]
+```
+
+Now that we have a list of SNPs to use in our model, the next step is to train the model based on HapMap data. In this example, we will use the CEU and YRI samples as surrogate parental populations. This can take a little while to run.
+
+```{r train, eval=FALSE}
+# setup.prior needs to reference the data in the hapmap dataset
+require(ALDdata)
+data(hapmap)
+
+require(ALDsuite)
+Pm.prior <- setup.prior(snps = colnames(phased), pops = c('YRI', 'CEU'), 
+                        maxpcs = 6, window = 0.1, phased = TRUE)
+```
+
+```{r train hidden, include=FALSE}
+# ran this 4 times creating the following files:
+#   dev_phased.RData (using ALDsuitedev)
+#   dev_unphased.RData (using ALDsuitedev)
+#   phased.RData
+#   unphased.RData
+
+data(hapmap)
+
+if(file.exists('phased.RData'))
+{
+    load('phased.RData')
+}else{
+    Pm.prior <- setup.prior(snps = colnames(phased), pops = c('YRI', 'CEU'), 
+                            maxpcs = 6, window = 0.1, phased = TRUE)
+    save(Pm.prior, file = 'phased.RData')
+}
+```
+
+### Inferring ancestry
+
+Now that we have trained our model, we can infer local ancestry in our data. The `ancestry()` function will need at least the following arguments:
+
+* Pm.prior - our model from the previous step
+* haps or geno - haplotypes or genotypes for each chromosome/individual. This should be a matrix of 0/1 (haplotypes) or 0/1/2 (genotypes) values with 
+* chr - chromosome number
+* pos - position of the markers (genetic position in cM is preferred, but physical position can be used)
+
+```{r inferrence, eval=FALSE}
+# pull information for rs numbers marking each window in Pm.prior
+info <- subset(hapmap, rs %in% names(Pm.prior))
+
+calls <- admixture(Pm.prior, haps = phased, chr = info$chr, pos = info$cM, cores = 1, iter = 1)
+```
+
+```{r inferrence actual, include=FALSE}
+if(file.exists('calls.RData'))
+{
+    load('calls.RData')
+}else{
+    # pull information for rs numbers marking each window in Pm.prior
+    info <- subset(hapmap, rs %in% names(Pm.prior))
+
+    calls <- admixture(Pm.prior, haps = phased, chr = info$chr, pos = info$cM, iter = 1)
+    save(calls, file = 'calls.RData')
+}
+```
+
+Your local chromosomal ancestry estimates will be given in `calls$gammas`.
+
+```{r output}
+str(calls$gammas)
+```

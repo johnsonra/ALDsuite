@@ -1,0 +1,330 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}});
+    </script>
+    <meta http-equiv="content-type" content="text/html;
+      charset=windows-1252">
+    <title>ALDsuite: Dense marker MALD using principal components of
+  ancestral linkage disequilibrium (Appendix)</title>
+  </head>
+
+<body>
+<p> Computational details for the algorithm used to sample the joint distribution of the HMM for inferring local ancestry. Throughout, parameters are indexed by $i$ (individual), $j$ (marker), $c$ (chromosome) and $k$ (ancestral population). </p>
+
+<h2> Initialization of parameter space </h2>
+<p>Distances, $d$, are calculated as the number of centimorgans to the previous marker, with each chromosome starting with a missing value. </p>
+
+<p> The modern allele frequencies on chromosome segments originating from ancestral populations, $\Omega$, parameterize the prior distribution of ancestral allele frequencies, $P$. Eigen vectors for groups of markers used in modeling of ancestral LD within each ancestral population are either given by the user or estimated from HapMap data by the software. Prior estimates of logistic regression coefficients, $H$, and their associated variance-covariance matrices, $\Sigma$, for inference of modern allele frequencies as a function of nearby, linked markers are also either provided by the user or estimated from HapMap data. All associated markers within a user definable window (default is 2 cM) are chosen to model ancestral LD, and the number of principal components, $m$-1, accounting for 80% of the genetic variation in each subset are chosen to be included in the model, making a total of $m$ coefficients, including the intercept. </p>
+
+<p> Initial values for ancestry, $A$, are obtained using a quick frequentist algorithm, and global ancestry estimates for each parent are initially equal. </p>
+
+<p> Initial values for average number of generations since admixture, $\lambda$, and effective population size of each prior population, $\tau$, can also be specified by the user. When unspecified, default values tuned to the analysis of African Americans are used. </p>
+
+<h2> MCMC Algorithm </h2>
+<h3> Step 1. Sample Ancestral States </h3>
+<p> Ancestral state probabilities are calculated using a forward-backward algorithm similar to that used by admixture software for sparse marker sets (<a href="http://www.ncbi.nlm.nih.gov/pubmed/15088268">Hoggart 2004</a>, <a href="http://www.ncbi.nlm.nih.gov/pubmed/12930761">Falush 2003</a>, <a href="http://www.ncbi.nlm.nih.gov/pubmed/15088269">Patterson 2004</a>) </font>. The main differences in our algorithm being that ancestral LD is indirectly modeled, allowing analysis of dense marker sets, and we estimate marginal ancestral state probabilities for each inherited chromosome, requiring the genotype data to be phased prior to analysis. These differences motivate the majority of differences between our package and other admixture software. In the forward portion of the algorithm, ancestral state probabilities, $\gamma$, are calculated at each locus, dependent on the genotype at each locus (probability that the $i$th individual's $j$th locus of chromosome $c$ originated from the $k$th ancestral population). </p>
+
+<!-- <h4><center> Equation 1 </center></h4> -->
+\begin{equation}
+\gamma = \left\{
+\begin{array}{ll}
+\frac{\text{P}\left( a = x | g = k \right) \text{P}\left( g = k \right)}{\text{P}\left( a = x \right)} & , a\ \text{known} \\
+\text{P}\left( g = k \right) & , a\ \text{unknown}
+\end{array}
+\right. \label{gamma}
+\end{equation}
+
+<p> Before we treat the probabilities in Equation 1, we note that the probability of an observed recombination event, $r_{ijc}$, over a distance of $d_j$ cM is a function of the number of generations since admixture, $\lambda_{ic}$: </p>
+
+<!-- <h4><center> Equation 2 & 3 </center></h4> -->
+\begin{eqnarray}
+\text{P}\left( r | \lambda = 1 \right) & = & \frac{1 - e^{-2d/100}}{2}, \label{Pr_lambda} \\
+\text{P}\left( r \right) & = & 1 - \left( \frac{1 + e^{-2d/100}}{2} \right)^\lambda \label{Pr}
+\end{eqnarray}
+
+<p> and the probability of any crossovers happening in one haplotype since admixture over a window of size $w$ cM follows a Poisson distribution: </p>
+
+<!-- <h4><center> Equation 4 </center></h4> -->
+\begin{equation}
+\text{P}\left( X > 0 | w \right) = 1 - e^{-\lambda w / 100}.\label{Pcrossover}
+\end{equation}
+
+<p> The probability of an individual's genotype at a locus, $a$, conditional on the ancestral state, $g$, is a function of the allele frequencies in each population and the principal components of nearby, linked markers, spanning a region of $w$ cM. </p>
+
+<!-- <h4><center> Equation 5 & 6 </center></h4> -->
+\begin{eqnarray}
+\text{P}\left( a = x | a_\bullet, g = k \right) & = & \left\{
+  \begin{array}{ll}
+    1 - f_j\left( a_\bullet, k, w \right) & , x = 0 \\
+    f_j\left( a_\bullet, k, w \right) & , x = 1
+  \end{array} \right. \label{Pa_gammas} \\
+f_j\left( a_\bullet, k, d \right) & = & p*\text{P}\left( X > 0 | w \right) + \\
+                                 &   & \text{logit}^{-1}\left(\beta_0 + \beta_1\text{PC}_1\left( a_\bullet \right) + \cdots \right)
+                                       \left( 1 - \text{P}\left( X > 0 | w \right)\right) \label{f_akd} \nonumber
+\end{eqnarray}
+
+<p> where the probability of one or more crossovers in the haplotype block of $w$ cM, which informs the principal components regression, is defined in Equation 3, and $p_{jk}$ is the allele frequency in chromosomes with $k$ ancestry. We highlight the dependence of Equation 4 on the probability of observing crossovers within the window supporting the principal components regression. If there is a crossover, the resulting haplotype is no longer representative of the ancestral population, and we rely upon the allele frequency instead. </p>
+
+<p> The probabilities of each ancestral state are further dependent on the ancestral probabilities at the previous locus, $\gamma_{i(j-1)K}$, the distance, $d_j$, between these loci (missing if it is the first locus on a chromosome), the individual's recombination rates, $\lambda_{ic}$, and the individual's global ancestry, $A_{ick}$ (the distance between loci is in cM). </p>
+
+<p> Now we treat the probability of the ancestral state, $k$, of a locus, dependent on the ancestral state at the previous locus in the Markov chain, $k^*$: </p>
+
+<!-- <h4><center> Equation 7 </center></h4> -->
+\begin{equation}
+\text{P}\left( g = k \right) = A*\text{P}\left( r \right) + \gamma_{j-1} * \left( 1 - \text{P}\left( r \right)\right). \label{Pg}
+\end{equation}
+
+<p> For the first locus on each chromosome, the only prior information available is the global ancestry of the parents. We essentially treat this scenario as if there were a known recombination event, i.e. $\text{P}(r_1) = 1$. </p>
+
+<p> This also applies to the marginal probability of the observed genotype, $a$, which depends Equation 4 and Equation 7: </p>
+
+<!-- <h4><center> Equation 8 </center></h4> -->
+\begin{equation}
+\text{P}\left( a = x \right) = \sum_k \text{P}\left( a = x | g = k \right)\text{P}\left( g = k \right). \label{Pa}
+\end{equation}
+
+<p> The reverse chain is nearly identical, starting from the opposite end of each chromosome and working back. The final probabilities at each locus are obtained by multiplying the forward and reverse chains and normalizing, </p>
+
+<!-- <h4><center> Equation 9 </center></h4> -->
+\begin{equation}
+\gamma = \left\lVert \gamma^f * \gamma^r \right\rVert, \label{gamma_norm}
+\end{equation}
+
+<p> and a sample, $G$, of $\gamma$ is taken for use in Step 2: </p>
+
+<!-- <h4><center> Equation 10 </center></h4> -->
+\begin{equation}
+G \sim \text{Multinomial}\left( \gamma \right). \label{Gsample}
+\end{equation}
+
+<h3> Step 2: Parameter Updates </h3>
+<h4> Updates of A and A$^X$, global ancestry </h2>
+<p>The prior of $A$ is Dirichlet distributed and parameterized by $\omega$. The posterior is Dirichlet distributed, parameterized by the sum of $\omega$ and $\gamma$, for all autosomal markers.
+
+<!-- <h4><center> Equation 11 & 12 </center></h4> -->
+\begin{eqnarray}
+    A & \sim & \text{Dirichlet}\left( \omega_1, \ldots, \omega_K \right) \label{Asample}\\
+\dot{A} & \sim & \text{Dirichlet}\left( \omega_1 + \sum_{jc}\gamma_1, \ldots, \omega_K + \sum_{jc}\gamma_K \right) \label{Adotsample}
+\end{eqnarray}
+
+<p> We accept the sampled values for each Metropolis-Hastings sample, $\dot{A}$, with probability </p>
+
+<!-- <h4><center> Equation 13 </center></h4> -->
+\begin{equation}
+\text{min}\left(1, \frac{\sideset{}{_k}\prod \dot{A}^{\omega-1}}{\sideset{}{_k}\prod A^{\omega-1}} \right). \label{keepA}
+\end{equation}
+
+<p><a href="http://www.ncbi.nlm.nih.gov/pubmed/15088269">Patterson et. al.</a> have noted that sex chromosome ancestry is highly correlated with autosomal chromosome ancestry. Sex chromosome ancestry proportions are parameterized the same way here, by a scalar value, $omega_X$, conditional on $A$. The posterior is Dirichlet distributed, parameterized by the product of $A$ and $\omega^X$ and the sum of $\gamma$ over the X chromosome. </p>
+
+<!-- <h4><center> Equation 14 & 15 </center></h4> -->
+\begin{eqnarray}
+    A^X & \sim & \text{Dirichlet}\left( \omega^X A \right) \label{AXsample} \\
+\dot{A}^X & \sim & \text{Dirichlet}\left( \omega^X A_1 + \sum_{jc}\gamma_1, \ldots, \omega^X A_K + \sum_{jc}\gamma_K \right) \label{AXdotsample}
+\end{eqnarray}
+
+<p> We accept the sampled values for each Metropolis-Hastings sample, $\dot{A}^X$, with probability </p>
+
+<!-- <h4><center> Equation 16 </center></h4> -->
+\begin{equation} 
+\text{min} \left( 1, \frac{\sideset{}{_k}\prod \left( \dot{A}^X \right)^{\omega^X A_k - 1}}
+                          {\sideset{}{_k}\prod \left( A^X \right)^{\omega^X A_k - 1} } \right) .
+\end{equation}
+
+<h4> Update of $\lambda$, mean number of generations since admixture </h4>
+<p>The prior of $\gamma$ is Gamma distributed, parameterized by a shape parameter, $\alpha_1$ and a rate parameter, $\alpha_2$. </p>
+
+<!-- <h4><center> Equation 17 </center></h4> -->
+\begin{equation}
+\lambda \sim \text{Gamma}\left( \alpha_1, \alpha_2 \right) \label{GammaPrior}
+\end{equation}
+
+<p> The posterior is Gamma distributed: </p>
+
+<!-- <h4><center> Equation 18 </center></h4> -->
+\begin{equation}
+\dot{\lambda} \sim \text{Gamma}\left( \alpha_1 + \#\ crossovers, \alpha_2 + \sum_j d \right). \label{GammaPosterior}
+\end{equation}
+
+<p> As noted in Equation 3, the number of crossovers is Poisson distributed. To sample the number of crossovers in each individual, conditional on there being at least 1 crossover, we generate a random uniform number for each locus, $q_j$, such that </p>
+
+<!-- <h4><center> Equation 19 </center></h4> -->
+\begin{equation}
+q_j \in \left( \text{P}\left( x = 0; \lambda_{ic}, d_j \right), 1 \right) \label{qPois}
+\end{equation}
+
+<p> and the number of corresponding crossovers for each locus, $n_{xj}$, such that </p>
+
+<!-- <h4><center> Equation 20 </center></h4> -->
+\begin{equation}
+\text{P}\left( x = nx_j - 1; \lambda_{ic}, d_j \right) < q_j \leq \text{P}\left( x = nx_j; \lambda_{ic},d_j \right). \label{ncrossovers}
+\end{equation}
+
+<p> We then calculate the probability of 0 crossovers given $G$, $px_{j0}$, at each locus, </p>
+
+<!-- <h4><center> Equation 21 </center></h4> -->
+\begin{eqnarray}
+px_{j0} & = & \text{P}\left( x = 0 \mid G_{ic}; \lambda_{ic}, d_j \right) \nonumber \\
+       & = & 1 - \text{P}\left( x > 0 \mid G_{ic}; \lambda_{ic}, d_j \right) \label{P0crossovers}
+\end{eqnarray}
+
+<p> where </p>
+
+<!-- <h4><center> Equation 22 </center></h4> -->
+\begin{equation}
+\text{P}\left( x > 0 \mid G_{ic}; \lambda_{ic}, d_j \right) = \left\{
+  \begin{array}{cl}
+    1 & , g_{ijc} \neq g_{i(j - 1)c} \\
+    \frac{A_{icg}\left( 1 - e^{-\lambda_{ic}d_j} \right)}{e^{-\lambda_{ic}d_j} + A_{icg}\left( 1 - e^{-\lambda_{ic}d_j} \right)} & , g_{ijc} = g_{i(j-1)c}
+  \end{array}
+\right. . \label{P1pcrossovers}
+\end{equation}
+
+<p> We keep the number of crossovers we sampled, $nx_j$, at that locus with probability $1-px_{j0}$. The sum of these sampled crossovers, we can sample the updated value, $\dot{\lambda}$, which we keep with probability </p>
+
+<!-- <h4><center> Equation 23 </center></h4> -->
+\begin{equation}
+\text{min}\left( 1, \frac{\dot{\lambda}^{\alpha_1 - 1} e^{-\alpha_2 \dot{\lambda}}}{\lambda^{\alpha_1 - 1} e^{-\alpha_2 \lambda}} \right). \label{keeplambda}
+\end{equation}
+
+<h4> Updates of $p$ and $\beta$, parameterizing allele frequencies for each population </h4>
+<p> The prior allele frequency of $p$ is Beta distributed, parameterized by the product of $\tau$ and $P$. The posterior is Beta distributed, parameterized by sum of the product of $\tau$ with $P$ and the number of reference/variant alleles sampled in Step 2. </p>
+
+<!-- <h4><center> Equation 24 & 25 </center></h4> -->
+\begin{eqnarray}
+          p & \sim \text{Beta} & \left( \tau P, \tau (1 - P) \right) \label{pPrior} \\
+\dot{p}_{jk} & \sim \text{Beta} & \left( \tau_k P_{jk} + \#\ reference\ alleles, \right. \nonumber\\
+             &                 & \left. \tau_k \left( 1 - P_{jk} \right) + \#\ variant\ alleles \right) \label{pPosterior}
+\end{eqnarray}
+
+<p> Each proportion is individually updated and is kept with probability </p>
+
+<!-- <h4><center> Equation 26 </center></h4> -->
+\begin{equation}
+\text{min}\left( 1, \frac{\sideset{}{_{ic}}\prod \dot{p}^{\tau P-1} (1 - \dot{p})^{\tau(1 - P)-1}}
+                         {\sideset{}{_{ic}}\prod p^{\tau P-1} (1 - p)^{\tau(1 - P)-1}} \right). \label{keepp}
+\end{equation}
+
+<p> For principal component regression modeling of the allele probabilities, conditional on local ancestry, $\beta$ is multivariate normally distributed, parameterized by the prior $B$ and the diagonal of $\Sigma$. The posterior is additionally parameterized by $\tau$ and the logistic regression coefficients, $\hat{\beta}$, of the principal component regression model of the haplotypes sampled at the end of Step 1. </p>
+
+<!-- <h4><center> Equation 27 & 28 </center></h4> -->
+\begin{eqnarray}
+    \beta & \sim & \text{N}\left(B, \frac{1}{\tau^2} \text{diag}\left( \Sigma \right) \text{I} \right) \label{betaPrior}\\
+\dot{\beta} & \sim & \text{N}\left(\frac{n\hat{\beta} + \tau B}{n + \tau},
+                                 \frac{1}{\left( n + \tau \right)^2} \text{diag}\left( \Sigma \right) \text{I} \right) \label{betaPosterior}
+\end{eqnarray}
+
+<p> The sampled value, $\dot{\beta}$, is kept with probability </p>
+
+<!-- <h4><center> Equation 29 </center></h4> -->
+\begin{equation}
+\text{min}\left( 1, e^{\frac{-\tau^2}{2}\left[
+                                               \left( \dot{\beta} - B \right)^T \left( \text{diag} \left( \Sigma \right) \text{I} \right)^{-1} \left( \dot{\beta} - B \right) -
+                                               \left( \beta - B \right)^T \left( \text{diag} \left( \Sigma \right) \text{I} \right)^{-1} \left( \beta - B \right)
+                                        \right]}
+          \right). \label{keepbeta}
+\end{equation}
+
+<h4> Update of $P$, $B$ and $\tau$, hyper parameters for $p$ and $\beta$ </h4>
+<p> The prior of $P$ is Beta distributed, parameterized by the number of observed alleles in the modern day equivalent to the founder populations (e.g. Africans and Europeans for African Americans). </p>
+
+<!-- <h4><center> Equation 30 </center></h4> -->
+\begin{equation}
+P \sim \text{Beta}\left( \Omega \right) \label{Pprior}
+\end{equation}
+
+<p> $\Omega$ is a vector of the number of variant alleles and the number of reference alleles in the modern-day ancestral surrogate population sample. After each update of $P$, $\dot{P}_{jk}$, the change is kept with probability </p>
+
+<!-- <h4><center> Equation 31 </center></h4> -->
+\begin{equation}
+\text{min}\left(1, \frac{\sideset{}{_k}\prod \Gamma(\tau P) \Gamma(\tau (1 - P)) p^{\tau \dot{P} - 1}(1 - p)^{\tau (1 - \dot{P}) - 1}}
+                        {\sideset{}{_k}\prod \Gamma(\tau P) \Gamma(\tau (1 - P)) p^{\tau P - 1}(1 - p)^{\tau (1 - P) - 1}}
+\right). \label{keepP}
+\end{equation}
+
+<p> The prior of $B$ is multivariate normally distributed as a function of $H$ and $\Sigma$, as estimated from the modern-day surrogate ancestral population. </p>
+
+<!-- <h4><center> Equation 32 </center></h4> -->
+\begin{equation}
+B \sim \text{N}\left( H, \text{diag}\left( \Sigma \right) \text{I} \right) \label{BPrior}
+\end{equation}
+
+<p> Sampled updates, $\dot{B}$, are kept with probability </p>
+
+<!-- <h4><center> Equation 33 </center></h4> -->
+\begin{equation}
+\text{min}\left(1, e^{\frac{-\tau^2}{2}\left[
+                                               \left( \beta - \dot{B} \right)^T \left( \text{diag} \left( \Sigma \right) \text{I} \right)^{-1} \left( \beta - \dot{B} \right) -
+                                               \left( \beta - B \right)^T \left( \text{diag} \left( \Sigma \right) \text{I} \right)^{-1} \left( \beta - B \right)
+                                        \right]}
+          \right). \label{keepBeta}
+\end{equation}
+
+<p> The prior of $\tau$ is log normally distributed such that log$_{10}(\tau)$ has a mean of 2 and standard deviation of 0.5, </p>
+
+<!-- <h4><center> Equation 34 </center></h4> -->
+\begin{equation}
+\text{log}_{10}(\tau) \sim \text{N}(2, 0.5). \label{tauPrior}
+\end{equation}
+
+<p> Samples values, $\dot{\tau}$, are kept with respective probabilities, </p>
+
+<!-- <h4><center> Equation 35 </center></h4> -->
+\begin{equation}
+\text{min}\left( 1, LR\left( \dot{\tau}, \tau \mid p, P \right) * LR\left( \dot{\tau}, \tau \mid \beta, B \right)\right) \label{keeptau}
+\end{equation}
+
+<p> where, given the length of $\beta = l$, </p>
+
+<!-- <h4><center> Equation 36 & 37 </center></h4> -->
+\begin{eqnarray}
+    LR\left(\dot{\tau}, \tau \mid p, P \right) & = & \frac{\sideset{}{_k}\prod \Gamma(\tau P) \Gamma(\tau (1 - P)) p^{\tau \dot{P} - 1}(1 - p)^{\tau (1 - \dot{P}) - 1}}
+                                                        {\sideset{}{_k}\prod \Gamma(\tau P) \Gamma(\tau (1 - P)) p^{\tau P - 1}(1 - p)^{\tau (1 - P) - 1}} \label{LR1} \\
+LR\left(\dot{\tau}, \tau \mid \beta, B \right) & = & \prod_{jk} \left( \frac{\dot{\tau}}{\tau} \right)^{-l}
+                                                             e^{\frac{\tau^2 - \dot{\tau}^2}{2} \left[ (\beta - B)^T \left( \text{diag}(\Sigma) \text{I} \right)^{-1} (\beta - B) \right]} \label{LR2}.
+\end{eqnarray}
+
+<h4> Update of $\omega$ and $\omega^X$, hyper parameters for $A$ and $A^X$ </h4>
+<p> The prior of $\omega$ and $\omega^X$ are log normally distributed, such that log$_{10}(\omega)$ has mean 1 and standard deviation 0.5. </p>
+
+<!-- <h4><center> Equation 38 & 39 </center></h4> -->
+\begin{eqnarray}
+\text{log}_{10}(\omega) & \sim & \text{N}(1, 0.5) \label{omegaPrior} \\
+\text{log}_{10}(\omega^X) & \sim & \text{N}(1, 0.5) \label{omegaXPrior}
+\end{eqnarray}
+
+<p> Updated values for $\omega$ and $\omega^X$, $\dot{\omega}$ and $\dot{\omega}^X$, are kept with probability </p>
+
+<!-- <h4><center> Equation 40 & 41 </center></h4> -->
+\begin{eqnarray}
+\text{min}\left( 1, \prod_{ic} \frac{\Gamma\left( \sideset{}{_k}\sum \dot{\omega} \right) \sideset{}{_k}\prod \Gamma(  \omega ) A^{\dot{\omega} - 1}}
+                                   {\Gamma\left( \sideset{}{_k}\sum     \omega \right) \sideset{}{_k}\prod \Gamma(\dot{\omega}) A^{  \omega  - 1}}
+          \right), \label{keepomega}\\
+\text{min}\left( 1, \prod_{ic} \frac{\Gamma\left( \sideset{}{_k}\sum A\dot{\omega}^X \right) \sideset{}{_k}\prod \Gamma(A    \omega^X) \left( A^X \right)^{A\dot{\omega}^X - 1}}
+                                   {\Gamma\left( \sideset{}{_k}\sum A    \omega ^X \right) \sideset{}{_k}\prod \Gamma(A\dot{\omega}^X) \left( A^X \right)^{A  \omega ^X - 1}}
+          \right). \label{keepomegaX}
+\end{eqnarray}
+
+<h4> Update of $\alpha$, hyper parameters for $\lambda$ </h4>
+<p> Similar to other admixture software, updates of α are a function of the mean of the Gamma distribution, $\alpha_1/\alpha_2 = m$, and the variance of the Gamma distribution, $\alpha_1/\alpha_2^2 = v$. Each is log normally distributed, such that log$_{10}(m)$ and log$_{10}(v)$ each have mean 1 and standard deviation 0.5. </p>
+
+<!-- <h4><center> Equation 42 & 43 </center></h4> -->
+\begin{eqnarray}
+\text{log}_{10}(m) & \sim & \text{N}(1, 0.5) \label{alPrior1}\\
+\text{log}_{10}(v) & \sim & \text{N}(1, 0.5) \label{alPrior2}
+\end{eqnarray}
+
+<p> Values for $m$ and $v$ are updated independently, parameterized by $\dot{\alpha}$, and are kept with probability </p>
+
+<!-- <h4><center> Equation 44 </center></h4> -->
+\begin{equation}
+\text{min}\left( 1, \frac{\sideset{}{_{ic}}\prod \Gamma(\alpha_1) \dot{\alpha}_2^{\dot{\alpha}_1} \lambda^{\dot{\alpha}_1 - 1} e^{-\dot{\alpha}_2\lambda}}
+                         {\sideset{}{_{ic}}\prod \Gamma(\dot{\alpha}_1) \alpha_2^{\alpha_1} \lambda^{\alpha_1 - 1} e^{-\alpha_2\lambda}}
+          \right).
+\end{equation}
+
+</body>
+
+</html>
