@@ -13,3 +13,6 @@ data
 *.xcodeproj/
 Icon*
 *.rds
+*.gz
+*.tbi
+

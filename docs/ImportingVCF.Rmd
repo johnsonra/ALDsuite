@@ -1,0 +1,73 @@
+---
+title: "Importing VCF data into ALDsuite"
+author: "Randy Johnson"
+date: "10/19/2018"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(VariantAnnotation)
+library(magrittr)
+```
+
+## Importing VCF files
+
+This is a bit dense, and there are probably better ways to do some of the steps shown here. Hopefully you find this useful in getting VCF data into ALDsuite.
+
+If you haven't isntalled the [VariantAnnotation](https://bioconductor.org/packages/release/bioc/html/VariantAnnotation.html) package from Bioconductor, you can do so as follows:
+
+```{r install VariantAnnotation, eval=FALSE}
+source("https://bioconductor.org/biocLite.R")
+biocLite("VariantAnnotation")
+```
+
+For this example, we will be pulling chromosome 22 data from the [1000 Genomes project](ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/). When we have downloaded the correct files, we will first scan the header of the VCF file to get sample names. In this case, the files are quite large, so we will want to process the data in batches.
+
+```{r scan vcf}
+library(VariantAnnotation)
+library(magrittr)
+
+# file name
+f <- 'ALL.chr22.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz'
+
+# Scan the header
+hdr <- scanVcfHeader(f)
+hdr
+
+# Pull allele frequencies, so we can focus on common variants
+af <- readInfo(f, 'AF')
+
+# Pull alternate alleles (for unix/linux systems only)
+# we will want to drop those with ',' - they are not SNPs
+drop <- paste('zgrep -v ^#', f, '| cut -f 5') %>%
+        system(intern = TRUE) %>%
+        grep(pattern = ',')
+
+# 0 when af<0.05, 1 when af>0.05
+af_gt_05 <- table(af > 0.05)[-drop,'TRUE']
+keep <- names(af_gt_05)[af_gt_05 == 1]
+
+# keep only variants with a single rs number
+keep <- grep('^rs', keep, value = TRUE) %>%              # starts with 'rs'
+        grep(pattern = ';', value = TRUE, invert = TRUE) # doesn't contain ';'
+```
+
+We now can specify which sample(s) we want to pull from the VCF file, and format for use in ALDsuite.
+
+```{r readGeno}
+# pull genotype data for 3 samples - keep only rs numbers identified above
+samp <- readGeno(f, 'GT', param = ScanVcfParam(samples=hdr@samples[2346:2348]))[keep,]
+
+# split phased data into two separate chromosomes for each individual
+phased <- NULL
+for(i in 1:ncol(samp))
+{
+    tmp <- base::strsplit(samp[,i], '|', fixed = TRUE)
+    phased <- rbind(phased, 
+                    as.numeric(sapply(tmp, `[`, 1)), # chromosome A
+                    as.numeric(sapply(tmp, `[`, 2))) # chromosome B
+    rownames(phased)[(i-1)*2 + 1:2] <- paste(colnames(samp)[i], c('A', 'B'), sep = '_')
+}
+
+str(phased)
+```

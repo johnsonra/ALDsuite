@@ -41,7 +41,7 @@ At this point the source directories may be deleted.
 
 ### Training on HapMap data
 
-Before you train your model using HapMap data, we need to know which markers you will be using. If you have a list of polymorphic rs numbers, you can skip this step, but for this example we are going to train the model for chromosome 20 using the phased ASW data from HapMap.
+Before you train your model using HapMap data, we need to know which markers you will be using. If you have a list of polymorphic rs numbers, you can skip this step, but for this example we are going to train the model for chromosome 20 using the phased ASW data from HapMap (see [Importing VCF files](ImportingVCF.html) for instructions on importing data from a VCF file).
 
 ```{r Get SNPs}
 require(ALDdata)
