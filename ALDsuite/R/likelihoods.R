@@ -168,7 +168,7 @@ P.gammas <- function(geno, P, Pm.prior, lambda, lambdaX, d, chr, A0, Ak, AX, gen
             }
         }
 
-        g.prev <- gammas[,1,,] # ignored, but this is the correct format...
+        g.prev <- gammas[,1,,, drop = FALSE] # ignored, but this is the correct format...
 
         # Reverse Chain #
         for(j in ord[length(ord):1])
