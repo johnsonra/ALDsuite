@@ -1,10 +1,7 @@
 *~
 testing
 testing/
-ALDsuite_0.*
 *.RData
-data/
-data
 *.so
 *.o
 *.history
@@ -15,4 +12,6 @@ Icon*
 *.rds
 *.gz
 *.tbi
-
+.Rproj.user/
+.DS_Store
+*.Rproj

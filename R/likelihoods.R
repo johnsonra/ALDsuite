@@ -191,13 +191,13 @@ P.gammas <- function(geno, P, Pm.prior, lambda, lambdaX, d, chr, A0, Ak, AX, gen
             }
         }
 
-        # normalize the two
-        sum2one <- function(x) x / sum(x)
-
-        # i = 3, j = 454
-        tmp <- apply(gammas, 1:3, sum2one)
-        gammas[,,,1] <- tmp[1,,,]
-        gammas[,,,2] <- tmp[2,,,]
+        # normalize the gammas such that they sum to 1
+        tmp <- apply(gammas[,ord,,, drop = FALSE], 1:3, function(x) x / sum(x))
+        
+        for(l in 1:dim(gammas)[4])
+        {
+          gammas[,ord,,l] <- tmp[l,,,]
+        }
     }
 
     return(gammas)

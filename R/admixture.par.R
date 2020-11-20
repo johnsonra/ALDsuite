@@ -30,6 +30,7 @@ admixture.par <- function()
     # Sample G #
     ############
 
+    if(FALSE){
     if(!exists("G"))
     {
         loglik.cur <- gammas[,1,,1]
@@ -202,6 +203,7 @@ admixture.par <- function()
     ## }else{
     ##     omegaX <- NA
     ## }
+    }
 
     point <- 14
     if(!burnin)

@@ -29,8 +29,8 @@
 \author{Randall Johnson <rjohnson@ncifcrf.gov>}
 
 \examples{
-  data(anc.ex1)
-  plot(anc.ex1)
+  #data(anc.ex1)
+  #plot(anc.ex1)
 }
 
 \keyword{ hplot }% at least one, from doc/KEYWORDS
